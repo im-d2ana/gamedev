@@ -10,16 +10,24 @@ const PLAYER_SIZE = 38;
 
 const START_Y = 540;
 
-const MIN_PLATFORM_GAP = 50;
-const MAX_PLATFORM_GAP = 100;
+// Платформы одного уровня равномерно делят ширину экрана на слоты.
+// Это гарантирует, что они далеко друг от друга и у игрока есть выбор.
+const MIN_PLATFORM_SIDE_GAP = 100;
 
-const PLATFORM_HORIZONTAL_GAP = 180;
+// Небольшой перепад высот внутри одного уровня, чтобы ряд не был плоским.
+const PLATFORM_LEVEL_Y_JITTER = 20;
 
 // Насколько низ игрока может уйти в платформу, чтобы отскок всё равно сработал.
 const PLATFORM_LANDING_TOLERANCE = 24;
 
-const PLATFORM_SPAWN_MARGIN = 200;
-const PLATFORM_REMOVE_MARGIN = 150;
+const PLATFORM_SPAWN_MARGIN = 300;
+const PLATFORM_REMOVE_MARGIN = 200;
+
+const MIN_PLATFORMS_PER_LEVEL = 2;
+const MAX_PLATFORMS_PER_LEVEL = 3;
+
+const MIN_LEVEL_GAP = 80;
+const MAX_LEVEL_GAP = 130;
 
 const DISAPPEARING_CHANCE = 0.15;
 
@@ -47,8 +55,6 @@ export class GameScene extends Phaser.Scene {
 
   private lastPlatformY = START_Y;
 
-  private lastPlatformX = 120;
-
   constructor() {
     super('GameScene');
   }
@@ -57,7 +63,6 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.gameOver = false;
     this.lastPlatformY = START_Y;
-    this.lastPlatformX = 120;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     
@@ -284,19 +289,16 @@ export class GameScene extends Phaser.Scene {
 
     if (y < this.highestPlatformY) {
       this.highestPlatformY = y;
-
-      // Запоминаем горизонталь самой высокой платформы —
-      // от неё считается следующий шаг генерации.
-      this.lastPlatformX = x;
     }
   }
 
   /**
    * Генерация платформ по принципу Doodle Jump.
    *
-   * Платформы создаются по одной, а не группами: каждая следующая
-   * ставится выше предыдущей на случайную высоту в пределах прыжка
-   * и со случайным смещением по горизонтали.
+   * Платформы создаются уровнями. Платформы одного уровня делят ширину
+   * экрана на равные слоты, поэтому всегда далеко друг от друга —
+   * игрок выбирает маршрут. Внутри уровня платформы чуть различаются
+   * по высоте.
    * С небольшой вероятностью платформа исчезает после приземления.
    */
   private generatePlatformsAbove(): void {
@@ -304,28 +306,35 @@ export class GameScene extends Phaser.Scene {
     const spawnLimit = camera.scrollY - PLATFORM_SPAWN_MARGIN;
 
     while (this.highestPlatformY > spawnLimit) {
-      // Шаг по вертикали должен быть прыгаемым.
-      const y =
+      const levelY =
         this.highestPlatformY -
-        Phaser.Math.Between(MIN_PLATFORM_GAP, MAX_PLATFORM_GAP);
+        Phaser.Math.Between(MIN_LEVEL_GAP, MAX_LEVEL_GAP);
 
-      // Смещение по горизонтали ограничиваем, чтобы платформа
-      // была достижима за один прыжок.
-      const minX = Math.max(
-        PLATFORM_WIDTH / 2,
-        this.lastPlatformX - PLATFORM_HORIZONTAL_GAP,
+      const count = Phaser.Math.Between(
+        MIN_PLATFORMS_PER_LEVEL,
+        MAX_PLATFORMS_PER_LEVEL,
       );
 
-      const maxX = Math.min(
-        this.scale.width - PLATFORM_WIDTH / 2,
-        this.lastPlatformX + PLATFORM_HORIZONTAL_GAP,
+      const slotWidth = this.scale.width / count;
+
+      // Насколько можно сдвинуть платформу внутри слота,
+      // сохранив зазор MIN_PLATFORM_SIDE_GAP между краями.
+      const jitter = Math.floor(
+        (slotWidth - PLATFORM_WIDTH - MIN_PLATFORM_SIDE_GAP) / 2,
       );
 
-      this.lastPlatformX = Phaser.Math.Between(minX, maxX);
+      for (let slot = 0; slot < count; slot++) {
+        const offset = jitter > 0 ? Phaser.Math.Between(-jitter, jitter) : 0;
 
-      const disappearing = Math.random() < DISAPPEARING_CHANCE;
+        const x = slotWidth * (slot + 0.5) + offset;
 
-      this.addPlatform(this.lastPlatformX, y, disappearing);
+        const y =
+          levelY + Phaser.Math.Between(-PLATFORM_LEVEL_Y_JITTER, 0);
+
+        const disappearing = Math.random() < DISAPPEARING_CHANCE;
+
+        this.addPlatform(x, y, disappearing);
+      }
     }
   }
 
