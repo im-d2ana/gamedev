@@ -29,7 +29,12 @@ const MAX_PLATFORMS_PER_LEVEL = 3;
 const MIN_LEVEL_GAP = 80;
 const MAX_LEVEL_GAP = 130;
 
-const DISAPPEARING_CHANCE = 0.15;
+// Базовая доля исчезающих платформ и её рост с высотой.
+const DISAPPEARING_CHANCE = 0.35;
+const DISAPPEARING_CHANCE_MAX = 0.6;
+
+// На сколько пикселей вверх надо подняться, чтобы доля стала максимальной.
+const DISAPPEARING_FULL_HEIGHT = 4000;
 
 const CAMERA_PLAYER_HEIGHT = 0.4;
 
@@ -299,7 +304,8 @@ export class GameScene extends Phaser.Scene {
    * экрана на равные слоты, поэтому всегда далеко друг от друга —
    * игрок выбирает маршрут. Внутри уровня платформы чуть различаются
    * по высоте.
-   * С небольшой вероятностью платформа исчезает после приземления.
+   * Часть платформ исчезает после приземления. Их доля растёт с высотой,
+   * но хотя бы одна платформа на уровне всегда остаётся надёжной.
    */
   private generatePlatformsAbove(): void {
     const camera = this.cameras.main;
@@ -323,6 +329,10 @@ export class GameScene extends Phaser.Scene {
         (slotWidth - PLATFORM_WIDTH - MIN_PLATFORM_SIDE_GAP) / 2,
       );
 
+      const chance = this.disappearingChance(levelY);
+
+      const disappearingSlots = this.pickDisappearingSlots(count, chance);
+
       for (let slot = 0; slot < count; slot++) {
         const offset = jitter > 0 ? Phaser.Math.Between(-jitter, jitter) : 0;
 
@@ -331,11 +341,45 @@ export class GameScene extends Phaser.Scene {
         const y =
           levelY + Phaser.Math.Between(-PLATFORM_LEVEL_Y_JITTER, 0);
 
-        const disappearing = Math.random() < DISAPPEARING_CHANCE;
-
-        this.addPlatform(x, y, disappearing);
+        this.addPlatform(x, y, disappearingSlots.has(slot));
       }
     }
+  }
+
+  /**
+   * Доля исчезающих платформ растёт с высотой:
+   * от DISAPPEARING_CHANCE внизу до DISAPPEARING_CHANCE_MAX вверху.
+   */
+  private disappearingChance(y: number): number {
+    const climbed = Math.max(0, START_Y - y);
+
+    const progress = Math.min(climbed / DISAPPEARING_FULL_HEIGHT, 1);
+
+    return (
+      DISAPPEARING_CHANCE +
+      (DISAPPEARING_CHANCE_MAX - DISAPPEARING_CHANCE) * progress
+    );
+  }
+
+  /**
+   * Выбирает номера платформ уровня, которые исчезнут.
+   * Если по случайности исчезли все, одна платформа остаётся надёжной —
+   * иначе уровень невозможно пройти.
+   */
+  private pickDisappearingSlots(count: number, chance: number): Set<number> {
+    const slots = new Set<number>();
+
+    for (let slot = 0; slot < count; slot++) {
+      if (Math.random() < chance) {
+        slots.add(slot);
+      }
+    }
+
+    if (slots.size === count) {
+      slots.delete(Phaser.Math.Between(0, count - 1));
+    }
+
+    return slots;
   }
 
   /**
