@@ -10,11 +10,18 @@ const PLAYER_SIZE = 38;
 
 const START_Y = 540;
 
-const MIN_PLATFORM_GAP = 75;
-const MAX_PLATFORM_GAP = 105;
+const MIN_PLATFORM_GAP = 50;
+const MAX_PLATFORM_GAP = 100;
+
+const PLATFORM_HORIZONTAL_GAP = 180;
+
+// Насколько низ игрока может уйти в платформу, чтобы отскок всё равно сработал.
+const PLATFORM_LANDING_TOLERANCE = 24;
 
 const PLATFORM_SPAWN_MARGIN = 200;
 const PLATFORM_REMOVE_MARGIN = 150;
+
+const DISAPPEARING_CHANCE = 0.15;
 
 const CAMERA_PLAYER_HEIGHT = 0.4;
 
@@ -25,7 +32,6 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
 
   private highestPlatformY = Number.POSITIVE_INFINITY;
-  private highestPlatformX = 0;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<
@@ -41,6 +47,8 @@ export class GameScene extends Phaser.Scene {
 
   private lastPlatformY = START_Y;
 
+  private lastPlatformX = 120;
+
   constructor() {
     super('GameScene');
   }
@@ -49,9 +57,9 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.gameOver = false;
     this.lastPlatformY = START_Y;
+    this.lastPlatformX = 120;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
-    this.highestPlatformX = 0;
     
     this.cameras.main.setScroll(0, 0);
 
@@ -72,7 +80,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         width / 2,
         58,
-        '← → / A D — движение    ↑ / W / SPACE — прыжок',
+        '← → / A D — движение. Игрок отскакивает от платформ сам',
         {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
@@ -122,36 +130,56 @@ export class GameScene extends Phaser.Scene {
     this.createEnemies();
     this.createControls();
 
-    // Столкновение игрока с платформами
-    this.physics.add.collider(
-    this.player,
-    this.platforms,
-    (_player, platformObject) => {
-      const platform = platformObject as Phaser.GameObjects.Rectangle;
+    // Платформы как в Doodle Jump: проходимые.
+    // Игрок не сталкивается с ними физически, а при падении сверху
+    // получает отскок.
+    this.physics.add.overlap(
+      this.player,
+      this.platforms,
+      (_player, platformObject) => {
+        const platform = platformObject as Phaser.GameObjects.Rectangle;
+        const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
 
-      if (platform.getData('used')) {
-        return;
-      }
+        // Отскок возможен только когда игрок падает вниз.
+        if (playerBody.velocity.y <= 0) {
+          return;
+        }
 
-      platform.setData('used', true);
+        // Игрок должен только что коснуться платформы сверху,
+        // а не пролетать сквозь неё.
+        const platformTop = platform.y - PLATFORM_HEIGHT / 2;
 
-      this.score += 1;
-      this.scoreText.setText(`Score: ${this.score}`);
+        if (playerBody.bottom > platformTop + PLATFORM_LANDING_TOLERANCE) {
+          return;
+        }
 
-      if (platform.getData('disappearing')) {
-        this.time.delayedCall(500, () => {
-          if (!platform.active) {
-            return;
-          }
+        playerBody.setVelocityY(-JUMP_SPEED);
 
-          platform.setVisible(false);
+        if (platform.getData('used')) {
+          return;
+        }
 
-          const body = platform.body as Phaser.Physics.Arcade.StaticBody;
-          body.enable = false;
-        });
-      }
-    },
-  );
+        platform.setData('used', true);
+
+        this.score += 1;
+        this.scoreText.setText(`Score: ${this.score}`);
+
+        if (platform.getData('disappearing')) {
+          this.time.delayedCall(500, () => {
+            if (!platform.active) {
+              return;
+            }
+
+            platform.setVisible(false);
+
+            const body = platform.body as Phaser.Physics.Arcade.StaticBody;
+            body.enable = false;
+          });
+        }
+      },
+      undefined,
+      this,
+    );
 
     // Столкновение игрока с врагами
     this.physics.add.overlap(
@@ -256,41 +284,48 @@ export class GameScene extends Phaser.Scene {
 
     if (y < this.highestPlatformY) {
       this.highestPlatformY = y;
-      this.highestPlatformX = x;
+
+      // Запоминаем горизонталь самой высокой платформы —
+      // от неё считается следующий шаг генерации.
+      this.lastPlatformX = x;
     }
   }
 
   /**
-   * Бесконечно создаём платформы выше камеры.
+   * Генерация платформ по принципу Doodle Jump.
+   *
+   * Платформы создаются по одной, а не группами: каждая следующая
+   * ставится выше предыдущей на случайную высоту в пределах прыжка
+   * и со случайным смещением по горизонтали.
+   * С небольшой вероятностью платформа исчезает после приземления.
    */
   private generatePlatformsAbove(): void {
     const camera = this.cameras.main;
-
-    // Граница, выше которой должен быть запас платформ
     const spawnLimit = camera.scrollY - PLATFORM_SPAWN_MARGIN;
 
-    // Пока запаса недостаточно, добавляем платформы
     while (this.highestPlatformY > spawnLimit) {
+      // Шаг по вертикали должен быть прыгаемым.
       const y =
         this.highestPlatformY -
         Phaser.Math.Between(MIN_PLATFORM_GAP, MAX_PLATFORM_GAP);
 
-      // Новая платформа находится недалеко по горизонтали
-      // от самой верхней платформы
+      // Смещение по горизонтали ограничиваем, чтобы платформа
+      // была достижима за один прыжок.
       const minX = Math.max(
         PLATFORM_WIDTH / 2,
-        this.highestPlatformX - 180,
+        this.lastPlatformX - PLATFORM_HORIZONTAL_GAP,
       );
 
       const maxX = Math.min(
         this.scale.width - PLATFORM_WIDTH / 2,
-        this.highestPlatformX + 180,
+        this.lastPlatformX + PLATFORM_HORIZONTAL_GAP,
       );
 
-      const x = Phaser.Math.Between(minX, maxX);
+      this.lastPlatformX = Phaser.Math.Between(minX, maxX);
 
-      // Пока создаём обычные платформы
-      this.addPlatform(x, y, false);
+      const disappearing = Math.random() < DISAPPEARING_CHANCE;
+
+      this.addPlatform(this.lastPlatformX, y, disappearing);
     }
   }
 
@@ -396,19 +431,8 @@ export class GameScene extends Phaser.Scene {
 
     body.setVelocityX(direction * PLAYER_SPEED);
 
-    // Прыжок.
-    const jumpPressed =
-      Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
-      Phaser.Input.Keyboard.JustDown(this.wasd.up) ||
-      Phaser.Input.Keyboard.JustDown(
-        this.input.keyboard!.addKey(
-          Phaser.Input.Keyboard.KeyCodes.SPACE,
-        ),
-      );
-
-    if (jumpPressed && body.blocked.down) {
-      body.setVelocityY(-JUMP_SPEED);
-    }
+    // Прыжок не нужен: игрок отскакивает от платформ сам
+    // (см. коллайдер в create).
 
     // Ограничение движения по горизонтали.
     this.player.x = Phaser.Math.Clamp(
