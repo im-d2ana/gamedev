@@ -10,11 +10,22 @@ const PLAYER_SIZE = 38;
 
 const START_Y = 540;
 
+const MIN_PLATFORM_GAP = 75;
+const MAX_PLATFORM_GAP = 105;
+
+const PLATFORM_SPAWN_MARGIN = 200;
+const PLATFORM_REMOVE_MARGIN = 150;
+
+const CAMERA_PLAYER_HEIGHT = 0.4;
+
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Triangle;
 
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private enemies!: Phaser.Physics.Arcade.Group;
+
+  private highestPlatformY = Number.POSITIVE_INFINITY;
+  private highestPlatformX = 0;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<
@@ -39,6 +50,11 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = false;
     this.lastPlatformY = START_Y;
 
+    this.highestPlatformY = Number.POSITIVE_INFINITY;
+    this.highestPlatformX = 0;
+    
+    this.cameras.main.setScroll(0, 0);
+
     const { width, height } = this.scale;
 
     // Заголовок
@@ -62,7 +78,8 @@ export class GameScene extends Phaser.Scene {
           color: '#cbd5e1',
         },
       )
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0);
 
     // Цель
     this.add
@@ -76,14 +93,16 @@ export class GameScene extends Phaser.Scene {
           color: '#94a3b8',
         },
       )
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0);
 
     // Счёт
     this.scoreText = this.add.text(24, 24, 'Score: 0', {
       fontFamily: 'system-ui, sans-serif',
       fontSize: '22px',
       color: '#ffffff',
-    });
+    })
+    .setScrollFactor(0);
 
     // Статус
     this.statusText = this.add
@@ -94,7 +113,8 @@ export class GameScene extends Phaser.Scene {
         align: 'center',
       })
       .setOrigin(0.5)
-      .setDepth(100);
+      .setDepth(100)
+      .setScrollFactor(0);
 
     this.createPlayer();
     this.createPlatforms();
@@ -149,6 +169,9 @@ export class GameScene extends Phaser.Scene {
 
     this.handleMovement();
     this.updateEnemies();
+    this.updateCamera();
+    this.generatePlatformsAbove();
+    this.removePlatformsBelow();
     this.checkFall();
     this.checkJumpScore();
   }
@@ -181,10 +204,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Создание платформ.
+   * Создание начальных платформ.
    *
-   * Большинство платформ обычные.
-   * Некоторые имеют специальное свойство "исчезнуть".
+   * Остальные платформы будут появляться автоматически.
    */
   private createPlatforms(): void {
     this.platforms = this.physics.add.staticGroup();
@@ -194,10 +216,10 @@ export class GameScene extends Phaser.Scene {
 
     // Основные платформы
     this.addPlatform(350, 470, false);
-    this.addPlatform(600, 390, true);
+    this.addPlatform(600, 390, false);
     this.addPlatform(820, 310, false);
 
-    this.addPlatform(620, 220, true);
+    this.addPlatform(620, 220, false);
     this.addPlatform(350, 160, false);
 
     this.addPlatform(700, 100, true);
@@ -230,6 +252,78 @@ export class GameScene extends Phaser.Scene {
     // Сохраняем информацию о платформе.
     platform.setData('disappearing', disappearing);
     platform.setData('used', false);
+
+    if (y < this.highestPlatformY) {
+      this.highestPlatformY = y;
+      this.highestPlatformX = x;
+    }
+  }
+
+  /**
+   * Бесконечно создаём платформы выше камеры.
+   */
+  private generatePlatformsAbove(): void {
+    const camera = this.cameras.main;
+
+    // Граница, выше которой должен быть запас платформ
+    const spawnLimit = camera.scrollY - PLATFORM_SPAWN_MARGIN;
+
+    // Пока запаса недостаточно, добавляем платформы
+    while (this.highestPlatformY > spawnLimit) {
+      const y =
+        this.highestPlatformY -
+        Phaser.Math.Between(MIN_PLATFORM_GAP, MAX_PLATFORM_GAP);
+
+      // Новая платформа находится недалеко по горизонтали
+      // от самой верхней платформы
+      const minX = Math.max(
+        PLATFORM_WIDTH / 2,
+        this.highestPlatformX - 180,
+      );
+
+      const maxX = Math.min(
+        this.scale.width - PLATFORM_WIDTH / 2,
+        this.highestPlatformX + 180,
+      );
+
+      const x = Phaser.Math.Between(minX, maxX);
+
+      // Пока создаём обычные платформы
+      this.addPlatform(x, y, false);
+    }
+  }
+
+  /**
+   * Камера поднимается, когда игрок достигает верхней части экрана.
+   * Вниз камера не движется.
+   */
+  private updateCamera(): void {
+    const camera = this.cameras.main;
+
+    const targetY =
+      this.player.y - camera.height * CAMERA_PLAYER_HEIGHT;
+
+    if (targetY < camera.scrollY) {
+      camera.scrollY = targetY;
+    }
+  }
+
+  /**
+   * Удаляем платформы, которые остались далеко ниже камеры.
+   */
+  private removePlatformsBelow(): void {
+    const camera = this.cameras.main;
+
+    const removeLimit =
+      camera.scrollY + camera.height + PLATFORM_REMOVE_MARGIN;
+
+    this.platforms.getChildren().forEach((child) => {
+      const platform = child as Phaser.GameObjects.Rectangle;
+
+      if (platform.y > removeLimit) {
+        this.platforms.remove(platform, true, true);
+      }
+    });
   }
 
   /**
@@ -240,9 +334,9 @@ export class GameScene extends Phaser.Scene {
   private createEnemies(): void {
     this.enemies = this.physics.add.group();
 
-    this.addEnemy(470, 430);
-    this.addEnemy(760, 270);
-    this.addEnemy(500, 120);
+    // this.addEnemy(470, 430);
+    // // this.addEnemy(760, 270);
+    // this.addEnemy(500, 120);
   }
 
   private addEnemy(x: number, y: number): void {
@@ -327,7 +421,9 @@ export class GameScene extends Phaser.Scene {
    * Проверяем падение игрока.
    */
   private checkFall(): void {
-    if (this.player.y > this.scale.height + 80) {
+    const bottomLimit = this.cameras.main.scrollY + this.cameras.main.height + 80;
+
+    if (this.player.y > bottomLimit) {
       this.endGame('ТЫ УПАЛ!');
     }
   }
