@@ -64,7 +64,8 @@ export class GameScene extends Phaser.Scene {
         fontSize: '28px',
         color: '#ffffff',
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0);
 
     // Управление
     this.add
