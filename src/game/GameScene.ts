@@ -10,12 +10,21 @@ const PLAYER_SIZE = 38;
 
 const START_Y = 540;
 
-// Платформы одного уровня равномерно делят ширину экрана на слоты.
-// Это гарантирует, что они далеко друг от друга и у игрока есть выбор.
-const MIN_PLATFORM_SIDE_GAP = 100;
+// Платформы одного уровня стоят далеко друг от друга,
+// чтобы у игрока был выбор маршрута.
+const MIN_PLATFORM_SIDE_GAP = 200;
 
 // Небольшой перепад высот внутри одного уровня, чтобы ряд не был плоским.
 const PLATFORM_LEVEL_Y_JITTER = 20;
+
+// Горизонтальный шаг между соседними уровнями. Прямо над платформой
+// предыдущего уровня новой не бывает, поэтому игроку приходится
+// управлять персонажем. MAX — предел одного прыжка.
+const MIN_LEVEL_X_SHIFT = 140;
+const MAX_LEVEL_X_SHIFT = 240;
+
+// Сколько раз подобрать позицию платформы, прежде чем взять первую попавшуюся.
+const LEVEL_POSITION_ATTEMPTS = 100;
 
 // Насколько низ игрока может уйти в платформу, чтобы отскок всё равно сработал.
 const PLATFORM_LANDING_TOLERANCE = 24;
@@ -23,8 +32,8 @@ const PLATFORM_LANDING_TOLERANCE = 24;
 const PLATFORM_SPAWN_MARGIN = 300;
 const PLATFORM_REMOVE_MARGIN = 200;
 
-const MIN_PLATFORMS_PER_LEVEL = 2;
-const MAX_PLATFORMS_PER_LEVEL = 3;
+const MIN_PLATFORMS_PER_LEVEL = 1;
+const MAX_PLATFORMS_PER_LEVEL = 2;
 
 const MIN_LEVEL_GAP = 80;
 const MAX_LEVEL_GAP = 130;
@@ -45,6 +54,10 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.Physics.Arcade.Group;
 
   private highestPlatformY = Number.POSITIVE_INFINITY;
+
+  private highestPlatformX = 0;
+
+  private previousLevelXs: number[] = [];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<
@@ -70,6 +83,8 @@ export class GameScene extends Phaser.Scene {
     this.lastPlatformY = START_Y;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
+    this.highestPlatformX = 0;
+    this.previousLevelXs = [];
     
     this.cameras.main.setScroll(0, 0);
 
@@ -262,6 +277,9 @@ export class GameScene extends Phaser.Scene {
     this.addPlatform(350, 160, false);
 
     this.addPlatform(700, 100, true);
+
+    // Генерация отсчитывается от самой высокой стартовой платформы.
+    this.previousLevelXs = [this.highestPlatformX];
   }
 
   /**
@@ -294,16 +312,17 @@ export class GameScene extends Phaser.Scene {
 
     if (y < this.highestPlatformY) {
       this.highestPlatformY = y;
+      this.highestPlatformX = x;
     }
   }
 
   /**
    * Генерация платформ по принципу Doodle Jump.
    *
-   * Платформы создаются уровнями. Платформы одного уровня делят ширину
-   * экрана на равные слоты, поэтому всегда далеко друг от друга —
-   * игрок выбирает маршрут. Внутри уровня платформы чуть различаются
-   * по высоте.
+   * Платформы создаются уровнями по 2-3 штуки. Каждая платформа
+   * смещена по горизонтали относительно платформ предыдущего уровня:
+   * прямо над прежней опорой новой не бывает, поэтому игроку приходится
+   * двигаться к новой платформе.
    * Часть платформ исчезает после приземления. Их доля растёт с высотой,
    * но хотя бы одна платформа на уровне всегда остаётся надёжной.
    */
@@ -321,29 +340,130 @@ export class GameScene extends Phaser.Scene {
         MAX_PLATFORMS_PER_LEVEL,
       );
 
-      const slotWidth = this.scale.width / count;
-
-      // Насколько можно сдвинуть платформу внутри слота,
-      // сохранив зазор MIN_PLATFORM_SIDE_GAP между краями.
-      const jitter = Math.floor(
-        (slotWidth - PLATFORM_WIDTH - MIN_PLATFORM_SIDE_GAP) / 2,
-      );
+      const positions = this.levelPositions(count);
 
       const chance = this.disappearingChance(levelY);
 
-      const disappearingSlots = this.pickDisappearingSlots(count, chance);
+      const disappearing = this.pickDisappearingSlots(positions.length, chance);
 
-      for (let slot = 0; slot < count; slot++) {
-        const offset = jitter > 0 ? Phaser.Math.Between(-jitter, jitter) : 0;
+      positions.forEach((x, index) => {
+        const y = levelY + Phaser.Math.Between(-PLATFORM_LEVEL_Y_JITTER, 0);
 
-        const x = slotWidth * (slot + 0.5) + offset;
+        this.addPlatform(x, y, disappearing.has(index));
+      });
+    }
+  }
 
-        const y =
-          levelY + Phaser.Math.Between(-PLATFORM_LEVEL_Y_JITTER, 0);
+  /**
+   * Горизонтали платформ одного уровня.
+   *
+   * Каждая позиция отстоит не ближе MIN_LEVEL_X_SHIFT от любой платформы
+   * предыдущего уровня (иначе получился бы вертикальный столб, который
+   * проходится без управления) и не дальше MAX_LEVEL_X_SHIFT от неё
+   * (иначе платформа будет недостижима за один прыжок).
+   */
+  private levelPositions(count: number): number[] {
+    const positions: number[] = [];
 
-        this.addPlatform(x, y, disappearingSlots.has(slot));
+    for (
+      let attempt = 0;
+      positions.length < count && attempt < LEVEL_POSITION_ATTEMPTS;
+      attempt++
+    ) {
+      const x = this.candidateX();
+
+      if (x === null) {
+        continue;
+      }
+
+      const farFromPrevious =
+        this.distanceToPrevious(x) >= MIN_LEVEL_X_SHIFT;
+
+      const farFromSiblings = positions.every(
+        (used) => Math.abs(used - x) >= PLATFORM_WIDTH + MIN_PLATFORM_SIDE_GAP,
+      );
+
+      if (farFromPrevious && farFromSiblings) {
+        positions.push(x);
       }
     }
+
+    // Уровень без платформ пройти нельзя, поэтому оставляем хотя бы одну.
+    if (positions.length === 0) {
+      positions.push(this.fallbackX());
+    }
+
+    this.previousLevelXs = positions;
+
+    return positions;
+  }
+
+  /**
+   * Запасная горизонталь для случая, когда валидную позицию подобрать
+   * не удалось. Берётся вариант, максимально далёкий от платформ
+   * предыдущего уровня, — вертикальный столб всё равно не получается.
+   */
+  private fallbackX(): number {
+    let best = this.randomX();
+    let bestDistance = -1;
+
+    for (let attempt = 0; attempt < LEVEL_POSITION_ATTEMPTS; attempt++) {
+      const x = this.candidateX();
+
+      if (x === null) {
+        continue;
+      }
+
+      const distance = this.distanceToPrevious(x);
+
+      if (distance >= MIN_LEVEL_X_SHIFT) {
+        return x;
+      }
+
+      if (distance > bestDistance) {
+        bestDistance = distance;
+        best = x;
+      }
+    }
+
+    return best;
+  }
+
+  private distanceToPrevious(x: number): number {
+    return Math.min(
+      ...this.previousLevelXs.map((previous) => Math.abs(previous - x)),
+    );
+  }
+
+  /**
+   * Случайная горизонталь в пределах одного прыжка от платформы
+   * предыдущего уровня, но не прямо над ней.
+   */
+  private candidateX(): number | null {
+    if (this.previousLevelXs.length === 0) {
+      return this.randomX();
+    }
+
+    const anchor = Phaser.Utils.Array.GetRandom(this.previousLevelXs);
+
+    const shift = Phaser.Math.Between(MIN_LEVEL_X_SHIFT, MAX_LEVEL_X_SHIFT);
+
+    const options = [anchor - shift, anchor + shift].filter(
+      (x) => x >= PLATFORM_WIDTH / 2 && x <= this.scale.width - PLATFORM_WIDTH / 2,
+    );
+
+    if (options.length === 0) {
+      return null;
+    }
+
+    return Phaser.Utils.Array.GetRandom(options);
+  }
+
+  private randomX(): number {
+    return Phaser.Math.Between(
+      PLATFORM_WIDTH / 2,
+      this.scale.width - PLATFORM_WIDTH / 2,
+    );
   }
 
   /**
