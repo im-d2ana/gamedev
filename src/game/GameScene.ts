@@ -45,6 +45,24 @@ const DISAPPEARING_CHANCE_MAX = 0.6;
 // На сколько пикселей вверх надо подняться, чтобы доля стала максимальной.
 const DISAPPEARING_FULL_HEIGHT = 4000;
 
+// Враги начинают появляться только после набора ENEMY_START_HEIGHT,
+// дальше их шанс растёт до ENEMY_CHANCE_MAX к ENEMY_FULL_HEIGHT.
+const ENEMY_CHANCE = 0.12;
+const ENEMY_CHANCE_MAX = 0.35;
+
+const ENEMY_START_HEIGHT = 400;
+const ENEMY_FULL_HEIGHT = 4000;
+
+const ENEMY_RADIUS = 16;
+const ENEMY_SPEED = 90;
+
+// Половина отрезка, по которому враг ходит туда-сюда.
+const ENEMY_PATROL_RANGE = 90;
+
+// Сколько раз подобрать горизонталь врага, чтобы он не висел
+// прямо над платформой и не мешал приземляться.
+const ENEMY_POSITION_ATTEMPTS = 40;
+
 const CAMERA_PLAYER_HEIGHT = 0.4;
 
 export class GameScene extends Phaser.Scene {
@@ -226,6 +244,7 @@ export class GameScene extends Phaser.Scene {
     this.updateCamera();
     this.generatePlatformsAbove();
     this.removePlatformsBelow();
+    this.removeEnemiesBelow();
     this.checkFall();
     this.checkJumpScore();
   }
@@ -325,14 +344,17 @@ export class GameScene extends Phaser.Scene {
    * двигаться к новой платформе.
    * Часть платформ исчезает после приземления. Их доля растёт с высотой,
    * но хотя бы одна платформа на уровне всегда остаётся надёжной.
+   * Часть уровней получает врага — его шанс тоже растёт с высотой.
    */
   private generatePlatformsAbove(): void {
     const camera = this.cameras.main;
     const spawnLimit = camera.scrollY - PLATFORM_SPAWN_MARGIN;
 
     while (this.highestPlatformY > spawnLimit) {
+      const previousLevelY = this.highestPlatformY;
+
       const levelY =
-        this.highestPlatformY -
+        previousLevelY -
         Phaser.Math.Between(MIN_LEVEL_GAP, MAX_LEVEL_GAP);
 
       const count = Phaser.Math.Between(
@@ -351,6 +373,66 @@ export class GameScene extends Phaser.Scene {
 
         this.addPlatform(x, y, disappearing.has(index));
       });
+
+      this.spawnEnemy(levelY, previousLevelY, positions);
+    }
+  }
+
+  /**
+   * Шанс появления врага на уровне растёт с высотой:
+   * от ENEMY_CHANCE после ENEMY_START_HEIGHT
+   * до ENEMY_CHANCE_MAX после ENEMY_FULL_HEIGHT.
+   * Ниже ENEMY_START_HEIGHT врагов нет — игрок осваивает управление.
+   */
+  private enemyChance(y: number): number {
+    const climbed = START_Y - y;
+
+    if (climbed < ENEMY_START_HEIGHT) {
+      return 0;
+    }
+
+    const progress = Math.min(
+      (climbed - ENEMY_START_HEIGHT) /
+        (ENEMY_FULL_HEIGHT - ENEMY_START_HEIGHT),
+      1,
+    );
+
+    return ENEMY_CHANCE + (ENEMY_CHANCE_MAX - ENEMY_CHANCE) * progress;
+  }
+
+  /**
+   * Ставит врага между уровнем и предыдущим уровнем — на траектории
+   * прыжка. Горизонталь подбирается так, чтобы враг не висел над
+   * платформой: иначе он перекрыл бы приземление и уровень нельзя
+   * было бы пройти.
+   */
+  private spawnEnemy(
+    levelY: number,
+    previousLevelY: number,
+    platformXs: number[],
+  ): void {
+    if (Math.random() >= this.enemyChance(levelY)) {
+      return;
+    }
+
+    const y = Math.round((levelY + previousLevelY) / 2);
+
+    for (let attempt = 0; attempt < ENEMY_POSITION_ATTEMPTS; attempt++) {
+      const x = Phaser.Math.Between(
+        ENEMY_RADIUS,
+        this.scale.width - ENEMY_RADIUS,
+      );
+
+      const blocksLanding = platformXs.some(
+        (platformX) =>
+          Math.abs(platformX - x) < PLATFORM_WIDTH / 2 + ENEMY_RADIUS,
+      );
+
+      if (!blocksLanding) {
+        this.addEnemy(x, y);
+
+        return;
+      }
     }
   }
 
@@ -536,20 +618,46 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Создание врагов.
+   * Удаляем врагов, которые остались далеко ниже камеры.
+   * Иначе они копились бы и замедляли игру.
+   */
+  private removeEnemiesBelow(): void {
+    const camera = this.cameras.main;
+
+    const removeLimit =
+      camera.scrollY + camera.height + PLATFORM_REMOVE_MARGIN;
+
+    const outdated: Phaser.GameObjects.Arc[] = [];
+
+    for (const child of this.enemies.children.values()) {
+      const enemy = child as Phaser.GameObjects.Arc;
+
+      if (enemy.y > removeLimit) {
+        outdated.push(enemy);
+      }
+    }
+
+    outdated.forEach((enemy) => {
+      this.enemies.remove(enemy, true, true);
+    });
+  }
+
+  /**
+   * Создание группы врагов.
    *
-   * Враг — простой круг.
+   * Враги появляются автоматически по мере набора высоты,
+   * см. spawnEnemy.
    */
   private createEnemies(): void {
     this.enemies = this.physics.add.group();
-
-    // this.addEnemy(470, 430);
-    // // this.addEnemy(760, 270);
-    // this.addEnemy(500, 120);
   }
 
+  /**
+   * Добавляет врага. Враг — круг, который ходит по горизонтальному
+   * отрезку туда-сюда.
+   */
   private addEnemy(x: number, y: number): void {
-    const enemy = this.add.circle(x, y, 16, 0xef4444);
+    const enemy = this.add.circle(x, y, ENEMY_RADIUS, 0xef4444);
 
     this.enemies.add(enemy);
 
@@ -558,10 +666,17 @@ export class GameScene extends Phaser.Scene {
     body.setAllowGravity(false);
 
     // Направление движения врага.
-    body.setVelocityX(100);
+    body.setVelocityX(ENEMY_SPEED);
 
-    enemy.setData('minX', x - 100);
-    enemy.setData('maxX', x + 100);
+    // Отрезок патрулирования не выходит за границы экрана.
+    const minX = Math.max(ENEMY_RADIUS, x - ENEMY_PATROL_RANGE);
+    const maxX = Math.min(
+      this.scale.width - ENEMY_RADIUS,
+      x + ENEMY_PATROL_RANGE,
+    );
+
+    enemy.setData('minX', minX);
+    enemy.setData('maxX', maxX);
   }
 
   /**
