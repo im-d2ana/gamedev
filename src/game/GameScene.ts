@@ -89,8 +89,6 @@ export class GameScene extends Phaser.Scene {
   private score = 0;
   private gameOver = false;
 
-  private lastPlatformY = START_Y;
-
   constructor() {
     super('GameScene');
   }
@@ -98,7 +96,6 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.score = 0;
     this.gameOver = false;
-    this.lastPlatformY = START_Y;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     this.highestPlatformX = 0;
@@ -246,7 +243,6 @@ export class GameScene extends Phaser.Scene {
     this.removePlatformsBelow();
     this.removeEnemiesBelow();
     this.checkFall();
-    this.checkJumpScore();
   }
 
   /**
@@ -798,20 +794,5 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => {
       this.scene.restart();
     });
-  }
-
-  /**
-   * Дополнительная проверка:
-   * если игрок движется достаточно высоко,
-   * создаём ощущение продвижения по уровню.
-   */
-  private checkJumpScore(): void {
-    if (this.player.y < this.lastPlatformY - 80) {
-      this.score += 1;
-
-      this.scoreText.setText(`Score: ${this.score}`);
-
-      this.lastPlatformY = this.player.y;
-    }
   }
 }
