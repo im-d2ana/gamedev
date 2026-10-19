@@ -45,7 +45,7 @@ const ENEMY_POSITION_ATTEMPTS = 40;
 
 const CAMERA_PLAYER_HEIGHT = 0.4;
 
-const PHASE_2_TIME_MS = 15000;
+const PHASE_2_SCORE = 10;
 const PHASE_BANNER_MS = 2000;
 
 const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;
@@ -80,8 +80,6 @@ export class GameScene extends Phaser.Scene {
   private pauseText!: Phaser.GameObjects.Text;
   private pauseKey!: Phaser.Input.Keyboard.Key;
 
-  private timerText!: Phaser.GameObjects.Text;
-  private elapsedMs = 0;
   private phase = 1;
 
   constructor() {
@@ -91,7 +89,6 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.score = 0;
     this.gameOver = false;
-    this.elapsedMs = 0;
     this.phase = 1;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
@@ -138,15 +135,6 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     })
     .setScrollFactor(0);
-
-    this.timerText = this.add
-      .text(width - 24, 24, 'Фаза 1 · 0:00', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '22px',
-        color: '#ffffff',
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
 
     this.statusText = this.add
       .text(width / 2, height / 2, '', {
@@ -200,6 +188,10 @@ export class GameScene extends Phaser.Scene {
         this.score += 1;
         this.scoreText.setText(`Score: ${this.score}`);
 
+        if (this.phase === 1 && this.score >= PHASE_2_SCORE) {
+          this.startPhase2();
+        }
+
         if (platform.getData('disappearing')) {
           this.time.delayedCall(500, () => {
             if (!platform.active) {
@@ -225,7 +217,7 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  update(_time: number, delta: number): void {
+  update(): void {
     if (
       Phaser.Input.Keyboard.JustDown(this.pauseKey) &&
       !this.gameOver
@@ -237,7 +229,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.updateTimer(delta);
     this.handleMovement();
     this.updateEnemies();
     this.updateCamera();
@@ -592,20 +583,6 @@ export class GameScene extends Phaser.Scene {
         body.setVelocityX(-Math.abs(body.velocity.x));
       }
     });
-  }
-
-  private updateTimer(delta: number): void {
-    this.elapsedMs += delta;
-
-    if (this.phase === 1 && this.elapsedMs >= PHASE_2_TIME_MS) {
-      this.startPhase2();
-    }
-
-    const totalSeconds = Math.floor(this.elapsedMs / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-
-    this.timerText.setText(`Фаза ${this.phase} · ${minutes}:${seconds}`);
   }
 
   private startPhase2(): void {
