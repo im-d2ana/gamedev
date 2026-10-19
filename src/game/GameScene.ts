@@ -69,6 +69,10 @@ export class GameScene extends Phaser.Scene {
   private score = 0;
   private gameOver = false;
 
+  private isPaused = false;
+  private pauseText!: Phaser.GameObjects.Text;
+  private pauseKey!: Phaser.Input.Keyboard.Key;
+
   constructor() {
     super('GameScene');
   }
@@ -96,7 +100,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 58, '← → / A D — движение', {
+      .text(width / 2, 58, '← → / A D — движение, P - паузу', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#cbd5e1',
@@ -132,6 +136,20 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(100)
       .setScrollFactor(0);
+
+    this.pauseText = this.add
+      .text(width / 2, height / 2, 'ПАУЗА', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '36px',
+        color: '#ffffff',
+        align: 'center',
+        backgroundColor: '#0f172a',
+        padding: { x: 20, y: 12 },
+      })
+      .setOrigin(0.5)
+      .setDepth(200)
+      .setScrollFactor(0)
+      .setVisible(false);
 
     this.createPlayer();
     this.createPlatforms();
@@ -186,7 +204,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(): void {
-    if (this.gameOver) {
+    if (
+      Phaser.Input.Keyboard.JustDown(this.pauseKey) &&
+      !this.gameOver
+    ) {
+      this.togglePause();
+    }
+
+    if (this.isPaused || this.gameOver) {
       return;
     }
 
@@ -479,6 +504,10 @@ export class GameScene extends Phaser.Scene {
       'left' | 'right',
       Phaser.Input.Keyboard.Key
     >;
+
+    this.pauseKey = this.input.keyboard.addKey(
+      Phaser.Input.Keyboard.KeyCodes.P
+    );
   }
 
   // движение игрока и прыжки.
@@ -535,6 +564,20 @@ export class GameScene extends Phaser.Scene {
         body.setVelocityX(-Math.abs(body.velocity.x));
       }
     });
+  }
+
+  private togglePause(): void {
+    this.isPaused = !this.isPaused;
+
+    if (this.isPaused) {
+      this.physics.world.pause();
+      this.time.paused = true;
+      this.pauseText.setVisible(true);
+    } else {
+      this.physics.world.resume();
+      this.time.paused = false;
+      this.pauseText.setVisible(false);
+    }
   }
 
   private endGame(message: string): void {
