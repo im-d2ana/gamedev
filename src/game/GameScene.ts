@@ -45,6 +45,13 @@ const ENEMY_POSITION_ATTEMPTS = 40;
 
 const CAMERA_PLAYER_HEIGHT = 0.4;
 
+const PHASE_2_TIME_MS = 15000;
+const PHASE_BANNER_MS = 2000;
+
+const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;
+const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.8;
+const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
+
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Triangle;
 
@@ -73,6 +80,10 @@ export class GameScene extends Phaser.Scene {
   private pauseText!: Phaser.GameObjects.Text;
   private pauseKey!: Phaser.Input.Keyboard.Key;
 
+  private timerText!: Phaser.GameObjects.Text;
+  private elapsedMs = 0;
+  private phase = 1;
+
   constructor() {
     super('GameScene');
   }
@@ -80,6 +91,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.score = 0;
     this.gameOver = false;
+    this.elapsedMs = 0;
+    this.phase = 1;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     this.highestPlatformX = 0;
@@ -125,6 +138,15 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     })
     .setScrollFactor(0);
+
+    this.timerText = this.add
+      .text(width - 24, 24, 'Фаза 1 · 0:00', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0);
 
     this.statusText = this.add
       .text(width / 2, height / 2, '', {
@@ -203,7 +225,7 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     if (
       Phaser.Input.Keyboard.JustDown(this.pauseKey) &&
       !this.gameOver
@@ -215,6 +237,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.updateTimer(delta);
     this.handleMovement();
     this.updateEnemies();
     this.updateCamera();
@@ -317,7 +340,11 @@ export class GameScene extends Phaser.Scene {
 
     const progress = Math.min((climbed - ENEMY_START_HEIGHT) / (ENEMY_FULL_HEIGHT - ENEMY_START_HEIGHT), 1);
 
-    return ENEMY_CHANCE + (ENEMY_CHANCE_MAX - ENEMY_CHANCE) * progress;
+    const chance = ENEMY_CHANCE + (ENEMY_CHANCE_MAX - ENEMY_CHANCE) * progress;
+
+    return this.phase === 2
+      ? Math.min(chance * PHASE_2_ENEMY_CHANCE_MULTIPLIER, 1)
+      : chance;
   }
 
   private spawnEnemy(levelY: number, previousLevelY: number, platformXs: number[]): void {
@@ -404,9 +431,10 @@ export class GameScene extends Phaser.Scene {
 
     const progress = Math.min(climbed / DISAPPEARING_FULL_HEIGHT, 1);
 
-    return (
-      DISAPPEARING_CHANCE + (DISAPPEARING_CHANCE_MAX - DISAPPEARING_CHANCE) * progress
-    );
+    const chance =
+      DISAPPEARING_CHANCE + (DISAPPEARING_CHANCE_MAX - DISAPPEARING_CHANCE) * progress;
+
+    return this.phase === 2 ? chance + PHASE_2_DISAPPEARING_CHANCE_BONUS : chance;
   }
 
   private pickDisappearingSlots(count: number, chance: number): Set<number> {
@@ -481,7 +509,7 @@ export class GameScene extends Phaser.Scene {
 
     const body = enemy.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
-    body.setVelocityX(ENEMY_SPEED);
+    body.setVelocityX(this.enemySpeed());
 
     const minX = Math.max(ENEMY_RADIUS, x - ENEMY_PATROL_RANGE);
     const maxX = Math.min(this.scale.width - ENEMY_RADIUS, x + ENEMY_PATROL_RANGE);
@@ -564,6 +592,41 @@ export class GameScene extends Phaser.Scene {
         body.setVelocityX(-Math.abs(body.velocity.x));
       }
     });
+  }
+
+  private updateTimer(delta: number): void {
+    this.elapsedMs += delta;
+
+    if (this.phase === 1 && this.elapsedMs >= PHASE_2_TIME_MS) {
+      this.startPhase2();
+    }
+
+    const totalSeconds = Math.floor(this.elapsedMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+
+    this.timerText.setText(`Фаза ${this.phase} · ${minutes}:${seconds}`);
+  }
+
+  private startPhase2(): void {
+    this.phase = 2;
+
+    // уже существующие враги тоже ускоряются
+    this.enemies.children.forEach((child: Phaser.GameObjects.GameObject) => {
+      const body = (child as Phaser.GameObjects.Arc).body as Phaser.Physics.Arcade.Body;
+      body.setVelocityX(body.velocity.x * PHASE_2_ENEMY_SPEED_MULTIPLIER);
+    });
+
+    this.statusText.setText('ФАЗА 2');
+    this.time.delayedCall(PHASE_BANNER_MS, () => {
+      if (!this.gameOver) {
+        this.statusText.setText('');
+      }
+    });
+  }
+
+  private enemySpeed(): number {
+    return this.phase === 2 ? ENEMY_SPEED * PHASE_2_ENEMY_SPEED_MULTIPLIER : ENEMY_SPEED;
   }
 
   private togglePause(): void {
