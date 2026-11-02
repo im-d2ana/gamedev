@@ -1,56 +1,6 @@
 import Phaser from 'phaser';
 
-const PLAYER_SPEED = 280;
-const JUMP_SPEED = 520;
-
-const PLATFORM_WIDTH = 150;
-const PLATFORM_HEIGHT = 20;
-
-const PLAYER_SIZE = 38;
-
-const START_Y = 540;
-
-const MIN_PLATFORM_SIDE_GAP = 200;
-const PLATFORM_LEVEL_Y_JITTER = 20;
-
-const MIN_LEVEL_X_SHIFT = 140;
-const MAX_LEVEL_X_SHIFT = 240;
-
-const LEVEL_POSITION_ATTEMPTS = 100;
-
-const PLATFORM_SPAWN_MARGIN = 300;
-const PLATFORM_REMOVE_MARGIN = 200;
-
-const MIN_PLATFORMS_PER_LEVEL = 1;
-const MAX_PLATFORMS_PER_LEVEL = 2;
-
-const MIN_LEVEL_GAP = 80;
-const MAX_LEVEL_GAP = 130;
-
-const DISAPPEARING_CHANCE = 0.35;
-const DISAPPEARING_CHANCE_MAX = 0.6;
-const DISAPPEARING_FULL_HEIGHT = 4000;
-
-const ENEMY_CHANCE = 0.12;
-const ENEMY_CHANCE_MAX = 0.35;
-
-const ENEMY_START_HEIGHT = 400;
-const ENEMY_FULL_HEIGHT = 4000;
-
-const ENEMY_RADIUS = 16;
-const ENEMY_SPEED = 90;
-
-const ENEMY_PATROL_RANGE = 90;
-const ENEMY_POSITION_ATTEMPTS = 40;
-
-const CAMERA_PLAYER_HEIGHT = 0.4;
-
-const PHASE_2_SCORE = 10;
-const PHASE_BANNER_MS = 2000;
-
-const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;
-const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.8;
-const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
+import * as config from './GameConfig';
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Triangle;
@@ -178,7 +128,7 @@ export class GameScene extends Phaser.Scene {
           return;
         }
 
-        playerBody.setVelocityY(-JUMP_SPEED);
+        playerBody.setVelocityY(-config.JUMP_SPEED);
 
         if (platform.getData('used')) {
           return;
@@ -188,7 +138,7 @@ export class GameScene extends Phaser.Scene {
         this.score += 1;
         this.scoreText.setText(`Score: ${this.score}`);
 
-        if (this.phase === 1 && this.score >= PHASE_2_SCORE) {
+        if (this.phase === 1 && this.score >= config.PHASE_2_SCORE) {
           this.startPhase2();
         }
 
@@ -240,10 +190,10 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(): void {
     this.player = this.add.triangle(
-      120, START_Y - PLAYER_SIZE,
-      0, PLAYER_SIZE,
-      PLAYER_SIZE, PLAYER_SIZE,
-      PLAYER_SIZE / 2, 0,
+      120, config.START_Y - config.PLAYER_SIZE,
+      0, config.PLAYER_SIZE,
+      config.PLAYER_SIZE, config.PLAYER_SIZE,
+      config.PLAYER_SIZE / 2, 0,
       0x38bdf8,
     );
 
@@ -251,7 +201,7 @@ export class GameScene extends Phaser.Scene {
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
 
-    body.setSize(PLAYER_SIZE, PLAYER_SIZE);
+    body.setSize(config.PLAYER_SIZE, config.PLAYER_SIZE);
     body.setAllowGravity(true);
     body.setCollideWorldBounds(false);
   }
@@ -259,7 +209,7 @@ export class GameScene extends Phaser.Scene {
   private createPlatforms(): void {
     this.platforms = this.physics.add.staticGroup();
 
-    this.addPlatform(120, START_Y, false);
+    this.addPlatform(120, config.START_Y, false);
     this.addPlatform(350, 470, false);
     this.addPlatform(600, 390, false);
     this.addPlatform(820, 310, false);
@@ -276,8 +226,8 @@ export class GameScene extends Phaser.Scene {
     const platform = this.add.rectangle(
       x,
       y,
-      PLATFORM_WIDTH,
-      PLATFORM_HEIGHT,
+      config.PLATFORM_WIDTH,
+      config.PLATFORM_HEIGHT,
       color,
     );
 
@@ -299,13 +249,13 @@ export class GameScene extends Phaser.Scene {
   // генерация новых платформ
   private generatePlatformsAbove(): void {
     const camera = this.cameras.main;
-    const spawnLimit = camera.scrollY - PLATFORM_SPAWN_MARGIN;
+    const spawnLimit = camera.scrollY - config.PLATFORM_SPAWN_MARGIN;
 
     while (this.highestPlatformY > spawnLimit) {
       const previousLevelY = this.highestPlatformY;
 
-      const levelY = previousLevelY - Phaser.Math.Between(MIN_LEVEL_GAP, MAX_LEVEL_GAP);
-      const count = Phaser.Math.Between(MIN_PLATFORMS_PER_LEVEL, MAX_PLATFORMS_PER_LEVEL);
+      const levelY = previousLevelY - Phaser.Math.Between(config.MIN_LEVEL_GAP, config.MAX_LEVEL_GAP);
+      const count = Phaser.Math.Between(config.MIN_PLATFORMS_PER_LEVEL, config.MAX_PLATFORMS_PER_LEVEL);
 
       const positions = this.levelPositions(count);
 
@@ -313,7 +263,7 @@ export class GameScene extends Phaser.Scene {
       const disappearing = this.pickDisappearingSlots(positions.length, chance);
 
       positions.forEach((x, index) => {
-        const y = levelY + Phaser.Math.Between(-PLATFORM_LEVEL_Y_JITTER, 0);
+        const y = levelY + Phaser.Math.Between(-config.PLATFORM_LEVEL_Y_JITTER, 0);
 
         this.addPlatform(x, y, disappearing.has(index));
       });
@@ -323,18 +273,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private enemyChance(y: number): number {
-    const climbed = START_Y - y;
+    const climbed = config.START_Y - y;
 
-    if (climbed < ENEMY_START_HEIGHT) {
+    if (climbed < config.ENEMY_START_HEIGHT) {
       return 0;
     }
 
-    const progress = Math.min((climbed - ENEMY_START_HEIGHT) / (ENEMY_FULL_HEIGHT - ENEMY_START_HEIGHT), 1);
+    const progress = Math.min((climbed - config.ENEMY_START_HEIGHT) / (config.ENEMY_FULL_HEIGHT - config.ENEMY_START_HEIGHT), 1);
 
-    const chance = ENEMY_CHANCE + (ENEMY_CHANCE_MAX - ENEMY_CHANCE) * progress;
+    const chance = config.ENEMY_CHANCE + (config.ENEMY_CHANCE_MAX - config.ENEMY_CHANCE) * progress;
 
     return this.phase === 2
-      ? Math.min(chance * PHASE_2_ENEMY_CHANCE_MULTIPLIER, 1)
+      ? Math.min(chance * config.PHASE_2_ENEMY_CHANCE_MULTIPLIER, 1)
       : chance;
   }
 
@@ -345,13 +295,13 @@ export class GameScene extends Phaser.Scene {
 
     const y = Math.round((levelY + previousLevelY) / 2);
 
-    for (let attempt = 0; attempt < ENEMY_POSITION_ATTEMPTS; attempt++) {
-      const x = Phaser.Math.Between(ENEMY_RADIUS, this.scale.width - ENEMY_RADIUS);
+    for (let attempt = 0; attempt < config.ENEMY_POSITION_ATTEMPTS; attempt++) {
+      const x = Phaser.Math.Between(config.ENEMY_RADIUS, this.scale.width - config.ENEMY_RADIUS);
 
       // проверка, чтобы враг не находился прямо над платформой
       const blocksLanding = platformXs.some(
         (platformX) =>
-          Math.abs(platformX - x) < PLATFORM_WIDTH / 2 + ENEMY_RADIUS,
+          Math.abs(platformX - x) < config.PLATFORM_WIDTH / 2 + config.ENEMY_RADIUS,
       );
 
       if (!blocksLanding) {
@@ -365,17 +315,17 @@ export class GameScene extends Phaser.Scene {
   private levelPositions(count: number): number[] {
     const positions: number[] = [];
 
-    for (let attempt = 0; positions.length < count && attempt < LEVEL_POSITION_ATTEMPTS; attempt++) {
+    for (let attempt = 0; positions.length < count && attempt < config.LEVEL_POSITION_ATTEMPTS; attempt++) {
       const x = this.candidateX();
 
       if (x === null) {
         continue;
       }
 
-      const farFromPrevious = this.distanceToPrevious(x) >= MIN_LEVEL_X_SHIFT;
+      const farFromPrevious = this.distanceToPrevious(x) >= config.MIN_LEVEL_X_SHIFT;
 
       const farFromSiblings = positions.every(
-        (used) => Math.abs(used - x) >= PLATFORM_WIDTH + MIN_PLATFORM_SIDE_GAP,
+        (used) => Math.abs(used - x) >= config.PLATFORM_WIDTH + config.MIN_PLATFORM_SIDE_GAP,
       );
 
       if (farFromPrevious && farFromSiblings) {
@@ -400,10 +350,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     const anchor = Phaser.Utils.Array.GetRandom(this.previousLevelXs);
-    const shift = Phaser.Math.Between(MIN_LEVEL_X_SHIFT, MAX_LEVEL_X_SHIFT);
+    const shift = Phaser.Math.Between(config.MIN_LEVEL_X_SHIFT, config.MAX_LEVEL_X_SHIFT);
 
     const options = [anchor - shift, anchor + shift].filter(
-      (x) => x >= PLATFORM_WIDTH / 2 && x <= this.scale.width - PLATFORM_WIDTH / 2,
+      (x) => x >= config.PLATFORM_WIDTH / 2 && x <= this.scale.width - config.PLATFORM_WIDTH / 2,
     );
 
     if (options.length === 0) {
@@ -414,18 +364,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private randomX(): number {
-    return Phaser.Math.Between(PLATFORM_WIDTH / 2, this.scale.width - PLATFORM_WIDTH / 2);
+    return Phaser.Math.Between(config.PLATFORM_WIDTH / 2, this.scale.width - config.PLATFORM_WIDTH / 2);
   }
 
   private disappearingChance(y: number): number {
-    const climbed = Math.max(0, START_Y - y);
+    const climbed = Math.max(0, config.START_Y - y);
 
-    const progress = Math.min(climbed / DISAPPEARING_FULL_HEIGHT, 1);
+    const progress = Math.min(climbed / config.DISAPPEARING_FULL_HEIGHT, 1);
 
     const chance =
-      DISAPPEARING_CHANCE + (DISAPPEARING_CHANCE_MAX - DISAPPEARING_CHANCE) * progress;
+      config.DISAPPEARING_CHANCE + (config.DISAPPEARING_CHANCE_MAX - config.DISAPPEARING_CHANCE) * progress;
 
-    return this.phase === 2 ? chance + PHASE_2_DISAPPEARING_CHANCE_BONUS : chance;
+    return this.phase === 2 ? chance + config.PHASE_2_DISAPPEARING_CHANCE_BONUS : chance;
   }
 
   private pickDisappearingSlots(count: number, chance: number): Set<number> {
@@ -447,17 +397,22 @@ export class GameScene extends Phaser.Scene {
   private updateCamera(): void {
     const camera = this.cameras.main;
 
-    const targetY = this.player.y - camera.height * CAMERA_PLAYER_HEIGHT;
+    const targetY = this.player.y - camera.height * config.CAMERA_PLAYER_HEIGHT;
 
     if (targetY < camera.scrollY) {
       camera.scrollY = targetY;
     }
   }
 
-  private removePlatformsBelow(): void {
+  // граница, ниже которой платформы и враги удаляются
+  private removeLimitY(): number {
     const camera = this.cameras.main;
 
-    const removeLimit = camera.scrollY + camera.height + PLATFORM_REMOVE_MARGIN;
+    return camera.scrollY + camera.height + config.PLATFORM_REMOVE_MARGIN;
+  }
+
+  private removePlatformsBelow(): void {
+    const removeLimit = this.removeLimitY();
 
     this.platforms.getChildren().forEach((child) => {
       const platform = child as Phaser.GameObjects.Rectangle;
@@ -469,9 +424,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private removeEnemiesBelow(): void {
-    const camera = this.cameras.main;
-
-    const removeLimit = camera.scrollY + camera.height + PLATFORM_REMOVE_MARGIN;
+    const removeLimit = this.removeLimitY();
 
     const outdated: Phaser.GameObjects.Arc[] = [];
 
@@ -494,7 +447,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addEnemy(x: number, y: number): void {
-    const enemy = this.add.circle(x, y, ENEMY_RADIUS, 0xef4444);
+    const enemy = this.add.circle(x, y, config.ENEMY_RADIUS, 0xef4444);
 
     this.enemies.add(enemy);
 
@@ -502,8 +455,8 @@ export class GameScene extends Phaser.Scene {
     body.setAllowGravity(false);
     body.setVelocityX(this.enemySpeed());
 
-    const minX = Math.max(ENEMY_RADIUS, x - ENEMY_PATROL_RANGE);
-    const maxX = Math.min(this.scale.width - ENEMY_RADIUS, x + ENEMY_PATROL_RANGE);
+    const minX = Math.max(config.ENEMY_RADIUS, x - config.ENEMY_PATROL_RANGE);
+    const maxX = Math.min(this.scale.width - config.ENEMY_RADIUS, x + config.ENEMY_PATROL_RANGE);
 
     enemy.setData('minX', minX);
     enemy.setData('maxX', maxX);
@@ -541,13 +494,13 @@ export class GameScene extends Phaser.Scene {
       direction = 1;
     }
 
-    body.setVelocityX(direction * PLAYER_SPEED);
+    body.setVelocityX(direction * config.PLAYER_SPEED);
 
     // ограничение выхода за экран
     this.player.x = Phaser.Math.Clamp(
       this.player.x,
-      PLAYER_SIZE / 2,
-      this.scale.width - PLAYER_SIZE / 2,
+      config.PLAYER_SIZE / 2,
+      this.scale.width - config.PLAYER_SIZE / 2,
     );
   }
 
@@ -591,11 +544,11 @@ export class GameScene extends Phaser.Scene {
     // уже существующие враги тоже ускоряются
     this.enemies.children.forEach((child: Phaser.GameObjects.GameObject) => {
       const body = (child as Phaser.GameObjects.Arc).body as Phaser.Physics.Arcade.Body;
-      body.setVelocityX(body.velocity.x * PHASE_2_ENEMY_SPEED_MULTIPLIER);
+      body.setVelocityX(body.velocity.x * config.PHASE_2_ENEMY_SPEED_MULTIPLIER);
     });
 
     this.statusText.setText('ФАЗА 2');
-    this.time.delayedCall(PHASE_BANNER_MS, () => {
+    this.time.delayedCall(config.PHASE_BANNER_MS, () => {
       if (!this.gameOver) {
         this.statusText.setText('');
       }
@@ -603,7 +556,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private enemySpeed(): number {
-    return this.phase === 2 ? ENEMY_SPEED * PHASE_2_ENEMY_SPEED_MULTIPLIER : ENEMY_SPEED;
+    return this.phase === 2 ? config.ENEMY_SPEED * config.PHASE_2_ENEMY_SPEED_MULTIPLIER : config.ENEMY_SPEED;
   }
 
   private togglePause(): void {
