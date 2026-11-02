@@ -29,6 +29,10 @@ export class GameScene extends Phaser.Scene {
   private score = 0;
   private gameOver = false;
 
+  private lives = 0;
+  private invulnerable = false;
+  private livesText!: Phaser.GameObjects.Text;
+
   private isPaused = false;
   private pauseText!: Phaser.GameObjects.Text;
   private pauseKey!: Phaser.Input.Keyboard.Key;
@@ -44,6 +48,8 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = false;
     this.isPaused = false;
     this.phase = 1;
+    this.lives = config.PLAYER_LIVES;
+    this.invulnerable = false;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     this.highestPlatformX = 0;
@@ -64,7 +70,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 58, '← → / A D — движение, P - паузу', {
+      .text(width / 2, 58, '← → или A D — движение   |   P — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#cbd5e1',
@@ -74,7 +80,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 82, 'Прыгай по платформам и набери как можно больше очков!', {
+      .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#94a3b8',
@@ -87,6 +93,14 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'system-ui, sans-serif',
       fontSize: '22px',
       color: '#ffffff',
+    })
+    .setScrollFactor(0);
+
+    this.livesText = this.add
+      .text(24, 54, `Lives: ${this.lives}`, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
     })
     .setScrollFactor(0);
 
@@ -377,13 +391,17 @@ export class GameScene extends Phaser.Scene {
   private checkFall(): void {
     const bottomLimit = this.cameras.main.scrollY + this.cameras.main.height + 80;
 
-    if (this.player.y > bottomLimit) {
-      this.endGame('ТЫ УПАЛ!');
+    if (this.player.y > bottomLimit && this.loseLife('ТЫ УПАЛ!')) {
+      this.respawnPlayer();
     }
   }
 
   private hitEnemy(): void {
-    this.endGame('ТЫ ПОПАЛСЯ!');
+    if (this.invulnerable) {
+      return;
+    }
+
+    this.loseLife('ТЫ ПОПАЛСЯ!');
   }
 
   private startPhase2(): void {
@@ -413,6 +431,62 @@ export class GameScene extends Phaser.Scene {
       this.time.paused = false;
       this.pauseText.setVisible(false);
     }
+  }
+
+    // возвращает true, если игрок ещё жив
+  private loseLife(message: string): boolean {
+    this.lives -= 1;
+    this.livesText.setText(`Lives: ${Math.max(this.lives, 0)}`);
+
+    if (this.lives <= 0) {
+      this.endGame(message);
+      return false;
+    }
+
+    this.invulnerable = true;
+    this.player.setAlpha(0.5);
+
+    this.time.delayedCall(config.INVULNERABLE_MS, () => {
+      if (this.gameOver) {
+        return;
+      }
+      this.invulnerable = false;
+      this.player.setAlpha(1);
+    });
+
+    return true;
+  }
+
+  // ставит игрока на самую нижнюю видимую платформу
+  private respawnPlayer(): void {
+    const camera = this.cameras.main;
+    const limit = camera.scrollY + camera.height - config.RESPAWN_BOTTOM_MARGIN;
+
+    let target: Phaser.GameObjects.Rectangle | null = null;
+
+    for (const child of this.platforms.getChildren()) {
+      const platform = child as Phaser.GameObjects.Rectangle;
+      const body = platform.body as Phaser.Physics.Arcade.StaticBody;
+
+      if (!platform.visible || !body.enable || platform.y > limit) {
+        continue;
+      }
+
+      if (target === null || platform.y > target.y) {
+        target = platform;
+      }
+    }
+
+    if (target === null) {
+      this.endGame('ТЫ УПАЛ!');
+      return;
+    }
+
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    body.reset(
+      target.x,
+      target.y - config.PLATFORM_HEIGHT / 2 - config.PLAYER_SIZE / 2 - 1,
+    );
   }
 
   private endGame(message: string): void {

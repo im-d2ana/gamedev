@@ -1,4 +1,4 @@
-export const PLAYER_SPEED = 280;
+export const PLAYER_SPEED = 400;
 export const JUMP_SPEED = 520;
 
 export const PLATFORM_WIDTH = 150;
@@ -50,3 +50,7 @@ export const PHASE_BANNER_MS = 2000;
 export const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;
 export const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.8;
 export const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
+
+export const PLAYER_LIVES = 3;
+export const INVULNERABLE_MS = 1500;
+export const RESPAWN_BOTTOM_MARGIN = 60;
