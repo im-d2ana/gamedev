@@ -27,13 +27,13 @@ export const MAX_LEVEL_GAP = 130;
 
 export const DISAPPEARING_CHANCE = 0.35;
 export const DISAPPEARING_CHANCE_MAX = 0.6;
-export const DISAPPEARING_FULL_HEIGHT = 4000;
+export const DISAPPEARING_FULL_HEIGHT = 12000;
 
 export const ENEMY_CHANCE = 0.12;
 export const ENEMY_CHANCE_MAX = 0.35;
 
 export const ENEMY_START_HEIGHT = 400;
-export const ENEMY_FULL_HEIGHT = 4000;
+export const ENEMY_FULL_HEIGHT = 12000;
 
 export const ENEMY_RADIUS = 16;
 export const ENEMY_SPEED = 90;

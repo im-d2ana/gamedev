@@ -42,6 +42,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.score = 0;
     this.gameOver = false;
+    this.isPaused = false;
     this.phase = 1;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
@@ -124,6 +125,9 @@ export class GameScene extends Phaser.Scene {
       this.player,
       this.platforms,
       (_player, platformObject) => {
+        if (this.gameOver) {
+          return;
+        }
         const platform = platformObject as Phaser.GameObjects.Rectangle;
         const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
 
