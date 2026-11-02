@@ -44,6 +44,7 @@ export const ENEMY_POSITION_ATTEMPTS = 40;
 export const CAMERA_PLAYER_HEIGHT = 0.4;
 
 export const PHASE_2_SCORE = 10;
+export const HAZARDS_START_PHASE = 2;
 export const PHASE_BANNER_MS = 2000;
 
 export const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;

@@ -1,6 +1,9 @@
 import * as config from './GameConfig';
 
 export function disappearingChance(y: number, phase: number): number {
+  if (phase < config.HAZARDS_START_PHASE) {
+    return 0;
+  }
   const climbed = Math.max(0, config.START_Y - y);
 
   const progress = Math.min(climbed / config.DISAPPEARING_FULL_HEIGHT, 1);
@@ -13,6 +16,9 @@ export function disappearingChance(y: number, phase: number): number {
 }
 
 export function enemyChance(y: number, phase: number): number {
+  if (phase < config.HAZARDS_START_PHASE) {
+    return 0;
+  }
   const climbed = config.START_Y - y;
 
   if (climbed < config.ENEMY_START_HEIGHT) {

@@ -218,7 +218,7 @@ export class GameScene extends Phaser.Scene {
     this.addPlatform(820, 310, false);
     this.addPlatform(620, 220, false);
     this.addPlatform(350, 160, false);
-    this.addPlatform(700, 100, true);
+    this.addPlatform(700, 100, false);
 
     this.levelGenerator.reset([this.highestPlatformX]);
   }
@@ -304,6 +304,30 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // платформы выше экрана создавались по правилам фазы 1, поэтому при смене фазы генерируем их заново
+  private regenerateLevelsAbove(): void {
+    const cutoff = this.cameras.main.scrollY - config.PLATFORM_HEIGHT;
+
+    this.platforms.getChildren().slice().forEach((child) => {
+      const platform = child as Phaser.GameObjects.Rectangle;
+
+      if (platform.y < cutoff) {
+        this.platforms.remove(platform, true, true);
+      }
+    });
+
+    // самая верхняя из оставшихся платформ снова становится точкой, от которой идёт генерация
+    const remaining = this.platforms.getChildren() as Phaser.GameObjects.Rectangle[];
+    const topY = Math.min(...remaining.map((platform) => platform.y));
+    const topLevelXs = remaining
+      .filter((platform) => platform.y - topY <= config.PLATFORM_LEVEL_Y_JITTER)
+      .map((platform) => platform.x);
+
+    this.highestPlatformY = topY;
+    this.highestPlatformX = topLevelXs[0];
+    this.levelGenerator.reset(topLevelXs);
+  }
+
   private createControls(): void {
     if (!this.input.keyboard) {
       throw new Error('Keyboard input is unavailable.');
@@ -360,6 +384,8 @@ export class GameScene extends Phaser.Scene {
 
   private startPhase2(): void {
     this.phase = 2;
+
+    this.time.delayedCall(0, () => this.regenerateLevelsAbove());
 
     this.enemies.speedUpForPhase2();
 
