@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 
 import * as config from './GameConfig';
 import { disappearingChance, enemyChance } from './difficulty';
+import { LevelGenerator, pickDisappearingSlots } from './LevelGenerator';
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Triangle;
@@ -13,7 +14,7 @@ export class GameScene extends Phaser.Scene {
 
   private highestPlatformX = 0;
 
-  private previousLevelXs: number[] = [];
+  private levelGenerator!: LevelGenerator;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<
@@ -44,11 +45,11 @@ export class GameScene extends Phaser.Scene {
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     this.highestPlatformX = 0;
-    this.previousLevelXs = [];
     
     this.cameras.main.setScroll(0, 0);
 
     const { width, height } = this.scale;
+    this.levelGenerator = new LevelGenerator(width);
 
     this.add
       .text(width / 2, 20, 'PLATFORM JUMP', {
@@ -218,7 +219,7 @@ export class GameScene extends Phaser.Scene {
     this.addPlatform(350, 160, false);
     this.addPlatform(700, 100, true);
 
-    this.previousLevelXs = [this.highestPlatformX];
+    this.levelGenerator.reset([this.highestPlatformX]);
   }
 
   private addPlatform(x: number, y: number, disappearing: boolean): void {
@@ -258,10 +259,10 @@ export class GameScene extends Phaser.Scene {
       const levelY = previousLevelY - Phaser.Math.Between(config.MIN_LEVEL_GAP, config.MAX_LEVEL_GAP);
       const count = Phaser.Math.Between(config.MIN_PLATFORMS_PER_LEVEL, config.MAX_PLATFORMS_PER_LEVEL);
 
-      const positions = this.levelPositions(count);
+      const positions = this.levelGenerator.nextPositions(count);
 
       const chance = disappearingChance(levelY, this.phase);
-      const disappearing = this.pickDisappearingSlots(positions.length, chance);
+      const disappearing = pickDisappearingSlots(positions.length, chance);
 
       positions.forEach((x, index) => {
         const y = levelY + Phaser.Math.Between(-config.PLATFORM_LEVEL_Y_JITTER, 0);
@@ -294,78 +295,6 @@ export class GameScene extends Phaser.Scene {
         return;
       }
     }
-  }
-
-  // выбор координат платформ одного уровня
-  private levelPositions(count: number): number[] {
-    const positions: number[] = [];
-
-    for (let attempt = 0; positions.length < count && attempt < config.LEVEL_POSITION_ATTEMPTS; attempt++) {
-      const x = this.candidateX();
-
-      if (x === null) {
-        continue;
-      }
-
-      const farFromPrevious = this.distanceToPrevious(x) >= config.MIN_LEVEL_X_SHIFT;
-
-      const farFromSiblings = positions.every(
-        (used) => Math.abs(used - x) >= config.PLATFORM_WIDTH + config.MIN_PLATFORM_SIDE_GAP,
-      );
-
-      if (farFromPrevious && farFromSiblings) {
-        positions.push(x);
-      }
-    }
-
-    this.previousLevelXs = positions;
-
-    return positions;
-  }
-
-  private distanceToPrevious(x: number): number {
-    return Math.min(
-      ...this.previousLevelXs.map((previous) => Math.abs(previous - x)),
-    );
-  }
-
-  private candidateX(): number | null {
-    if (this.previousLevelXs.length === 0) {
-      return this.randomX();
-    }
-
-    const anchor = Phaser.Utils.Array.GetRandom(this.previousLevelXs);
-    const shift = Phaser.Math.Between(config.MIN_LEVEL_X_SHIFT, config.MAX_LEVEL_X_SHIFT);
-
-    const options = [anchor - shift, anchor + shift].filter(
-      (x) => x >= config.PLATFORM_WIDTH / 2 && x <= this.scale.width - config.PLATFORM_WIDTH / 2,
-    );
-
-    if (options.length === 0) {
-      return null;
-    }
-
-    return Phaser.Utils.Array.GetRandom(options);
-  }
-
-  private randomX(): number {
-    return Phaser.Math.Between(config.PLATFORM_WIDTH / 2, this.scale.width - config.PLATFORM_WIDTH / 2);
-  }
-
-  private pickDisappearingSlots(count: number, chance: number): Set<number> {
-    const slots = new Set<number>();
-
-    for (let slot = 0; slot < count; slot++) {
-      if (Math.random() < chance) {
-        slots.add(slot);
-      }
-    }
-
-    if (slots.size === count) {
-      slots.delete(Phaser.Math.Between(0, count - 1));
-    }
-
-    return slots;
   }
 
   private updateCamera(): void {
