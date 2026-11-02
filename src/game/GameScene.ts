@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
 import * as config from './GameConfig';
+import { disappearingChance, enemyChance } from './difficulty';
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Triangle;
@@ -259,7 +260,7 @@ export class GameScene extends Phaser.Scene {
 
       const positions = this.levelPositions(count);
 
-      const chance = this.disappearingChance(levelY);
+      const chance = disappearingChance(levelY, this.phase);
       const disappearing = this.pickDisappearingSlots(positions.length, chance);
 
       positions.forEach((x, index) => {
@@ -272,24 +273,8 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private enemyChance(y: number): number {
-    const climbed = config.START_Y - y;
-
-    if (climbed < config.ENEMY_START_HEIGHT) {
-      return 0;
-    }
-
-    const progress = Math.min((climbed - config.ENEMY_START_HEIGHT) / (config.ENEMY_FULL_HEIGHT - config.ENEMY_START_HEIGHT), 1);
-
-    const chance = config.ENEMY_CHANCE + (config.ENEMY_CHANCE_MAX - config.ENEMY_CHANCE) * progress;
-
-    return this.phase === 2
-      ? Math.min(chance * config.PHASE_2_ENEMY_CHANCE_MULTIPLIER, 1)
-      : chance;
-  }
-
   private spawnEnemy(levelY: number, previousLevelY: number, platformXs: number[]): void {
-    if (Math.random() >= this.enemyChance(levelY)) {
+    if (Math.random() >= enemyChance(levelY, this.phase)) {
       return;
     }
 
@@ -365,17 +350,6 @@ export class GameScene extends Phaser.Scene {
 
   private randomX(): number {
     return Phaser.Math.Between(config.PLATFORM_WIDTH / 2, this.scale.width - config.PLATFORM_WIDTH / 2);
-  }
-
-  private disappearingChance(y: number): number {
-    const climbed = Math.max(0, config.START_Y - y);
-
-    const progress = Math.min(climbed / config.DISAPPEARING_FULL_HEIGHT, 1);
-
-    const chance =
-      config.DISAPPEARING_CHANCE + (config.DISAPPEARING_CHANCE_MAX - config.DISAPPEARING_CHANCE) * progress;
-
-    return this.phase === 2 ? chance + config.PHASE_2_DISAPPEARING_CHANCE_BONUS : chance;
   }
 
   private pickDisappearingSlots(count: number, chance: number): Set<number> {
