@@ -1,14 +1,15 @@
 import Phaser from 'phaser';
 
 import * as config from './GameConfig';
-import { disappearingChance, enemyChance } from './difficulty';
+import { disappearingChance } from './difficulty';
+import { Enemies } from './enemies';
 import { LevelGenerator, pickDisappearingSlots } from './LevelGenerator';
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Triangle;
 
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
-  private enemies!: Phaser.Physics.Arcade.Group;
+  private enemies!: Enemies;
 
   private highestPlatformY = Number.POSITIVE_INFINITY;
 
@@ -115,7 +116,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createPlayer();
     this.createPlatforms();
-    this.createEnemies();
+    this.enemies = new Enemies(this);
     this.createControls();
 
     // сквозное поведение платформ
@@ -162,7 +163,7 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.overlap(
       this.player,
-      this.enemies,
+      this.enemies.group,
       this.hitEnemy,
       undefined,
       this,
@@ -182,11 +183,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.handleMovement();
-    this.updateEnemies();
+    this.enemies.update();
     this.updateCamera();
     this.generatePlatformsAbove();
     this.removePlatformsBelow();
-    this.removeEnemiesBelow();
+    this.enemies.removeBelow(this.removeLimitY());
     this.checkFall();
   }
 
@@ -270,30 +271,7 @@ export class GameScene extends Phaser.Scene {
         this.addPlatform(x, y, disappearing.has(index));
       });
 
-      this.spawnEnemy(levelY, previousLevelY, positions);
-    }
-  }
-
-  private spawnEnemy(levelY: number, previousLevelY: number, platformXs: number[]): void {
-    if (Math.random() >= enemyChance(levelY, this.phase)) {
-      return;
-    }
-
-    const y = Math.round((levelY + previousLevelY) / 2);
-
-    for (let attempt = 0; attempt < config.ENEMY_POSITION_ATTEMPTS; attempt++) {
-      const x = Phaser.Math.Between(config.ENEMY_RADIUS, this.scale.width - config.ENEMY_RADIUS);
-
-      // проверка, чтобы враг не находился прямо над платформой
-      const blocksLanding = platformXs.some(
-        (platformX) =>
-          Math.abs(platformX - x) < config.PLATFORM_WIDTH / 2 + config.ENEMY_RADIUS,
-      );
-
-      if (!blocksLanding) {
-        this.addEnemy(x, y);
-        return;
-      }
+      this.enemies.spawn(levelY, previousLevelY, positions, this.phase);
     }
   }
 
@@ -324,45 +302,6 @@ export class GameScene extends Phaser.Scene {
         this.platforms.remove(platform, true, true);
       }
     });
-  }
-
-  private removeEnemiesBelow(): void {
-    const removeLimit = this.removeLimitY();
-
-    const outdated: Phaser.GameObjects.Arc[] = [];
-
-    for (const child of this.enemies.children.values()) {
-      const enemy = child as Phaser.GameObjects.Arc;
-
-      if (enemy.y > removeLimit) {
-        outdated.push(enemy);
-      }
-    }
-
-    outdated.forEach((enemy) => {
-      this.enemies.remove(enemy, true, true);
-    });
-  }
-
-  // cоздание группы врагов
-  private createEnemies(): void {
-    this.enemies = this.physics.add.group();
-  }
-
-  private addEnemy(x: number, y: number): void {
-    const enemy = this.add.circle(x, y, config.ENEMY_RADIUS, 0xef4444);
-
-    this.enemies.add(enemy);
-
-    const body = enemy.body as Phaser.Physics.Arcade.Body;
-    body.setAllowGravity(false);
-    body.setVelocityX(this.enemySpeed());
-
-    const minX = Math.max(config.ENEMY_RADIUS, x - config.ENEMY_PATROL_RANGE);
-    const maxX = Math.min(this.scale.width - config.ENEMY_RADIUS, x + config.ENEMY_PATROL_RANGE);
-
-    enemy.setData('minX', minX);
-    enemy.setData('maxX', maxX);
   }
 
   private createControls(): void {
@@ -419,36 +358,10 @@ export class GameScene extends Phaser.Scene {
     this.endGame('ТЫ ПОПАЛСЯ!');
   }
 
-  // движение врагов
-  private updateEnemies(): void {
-    this.enemies.children.forEach((child: Phaser.GameObjects.GameObject) => {
-      const enemy = child as Phaser.GameObjects.Arc;
-
-      if (!enemy.active) {
-        return;
-      }
-
-      const body = enemy.body as Phaser.Physics.Arcade.Body;
-      const minX = enemy.getData('minX') as number;
-      const maxX = enemy.getData('maxX') as number;
-
-      if (enemy.x <= minX) {
-        body.setVelocityX(Math.abs(body.velocity.x));
-      }
-      if (enemy.x >= maxX) {
-        body.setVelocityX(-Math.abs(body.velocity.x));
-      }
-    });
-  }
-
   private startPhase2(): void {
     this.phase = 2;
 
-    // уже существующие враги тоже ускоряются
-    this.enemies.children.forEach((child: Phaser.GameObjects.GameObject) => {
-      const body = (child as Phaser.GameObjects.Arc).body as Phaser.Physics.Arcade.Body;
-      body.setVelocityX(body.velocity.x * config.PHASE_2_ENEMY_SPEED_MULTIPLIER);
-    });
+    this.enemies.speedUpForPhase2();
 
     this.statusText.setText('ФАЗА 2');
     this.time.delayedCall(config.PHASE_BANNER_MS, () => {
@@ -456,10 +369,6 @@ export class GameScene extends Phaser.Scene {
         this.statusText.setText('');
       }
     });
-  }
-
-  private enemySpeed(): number {
-    return this.phase === 2 ? config.ENEMY_SPEED * config.PHASE_2_ENEMY_SPEED_MULTIPLIER : config.ENEMY_SPEED;
   }
 
   private togglePause(): void {
