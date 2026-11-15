@@ -102,3 +102,11 @@ export const HIT_SHAKE_MS = 220;
 export const HIT_SHAKE_INTENSITY = 0.008;
 export const HEART_POP_SCALE = 1.6;
 export const HEART_POP_MS = 140;
+
+// возвращение на платформу после падения: зелёная вспышка и расходящееся кольцо (без красного и тряски)
+export const RESPAWN_FLASH_COLOR = 0x36e377;
+export const RESPAWN_FLASH_MS = 200;
+export const RESPAWN_RING_RADIUS = 24;
+export const RESPAWN_RING_WIDTH = 4;
+export const RESPAWN_RING_SCALE = 3;
+export const RESPAWN_RING_MS = 450;

@@ -93,20 +93,20 @@ export class GameScene extends Phaser.Scene {
       .setDepth(-10)
       .setTileScale(config.SPRITE_SCALE);
 
-    // this.add
-    //   .text(width / 2, 20, 'PLATFORM JUMP', {
-    //     fontFamily: 'system-ui, sans-serif',
-    //     fontSize: '28px',
-    //     color: '#ffffff',
-    //     stroke: config.HUD_STROKE_COLOR,
-    //     strokeThickness: config.HUD_STROKE_THICKNESS,
-    //   })
-    //   .setOrigin(0.5, 0)
-    //   .setDepth(100)
-    //   .setScrollFactor(0);
+    this.add
+      .text(width / 2, 20, 'PLATFORM JUMP', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '28px',
+        color: '#ffffff',
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.HUD_STROKE_THICKNESS,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(100)
+      .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 20, '← → или A D — движение   |   P — пауза', {
+      .text(width / 2, 58, '← → или A D — движение   |   P — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -118,7 +118,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 44, 'Двигайся влево-вправо и попадай на платформы!', {
+      .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -512,6 +512,10 @@ export class GameScene extends Phaser.Scene {
 
     if (this.player.y > bottomLimit && this.loseLife('ТЫ УПАЛ!')) {
       this.respawnPlayer();
+
+      if (!this.gameOver) {
+        this.playRespawnEffect();
+      }
     }
   }
 
@@ -521,6 +525,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.loseLife('ТЫ ПОПАЛСЯ!');
+    this.playHitEffect();
   }
 
   private startPhase2(): void {
@@ -556,7 +561,7 @@ export class GameScene extends Phaser.Scene {
   private loseLife(message: string): boolean {
     this.lives -= 1;
     this.updateHearts();
-    this.playHitEffect();
+    this.popLostHeart();
 
     if (this.lives <= 0) {
       this.endGame(message);
@@ -577,13 +582,38 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  // заметная реакция на урон: красный силуэт, тряска экрана и «удар» по потерянному сердцу
+  // удар врага: красный силуэт и тряска экрана
   private playHitEffect(): void {
-    this.player.setTint(config.HIT_FLASH_COLOR).setTintMode(Phaser.TintModes.FILL);
-    this.time.delayedCall(config.HIT_FLASH_MS, () => this.player.clearTint());
-
+    this.flashPlayer(config.HIT_FLASH_COLOR, config.HIT_FLASH_MS);
     this.cameras.main.shake(config.HIT_SHAKE_MS, config.HIT_SHAKE_INTENSITY);
+  }
 
+  // возвращение после падения: зелёный силуэт и кольцо на месте появления
+  private playRespawnEffect(): void {
+    this.flashPlayer(config.RESPAWN_FLASH_COLOR, config.RESPAWN_FLASH_MS);
+
+    const ring = this.add
+      .circle(this.player.x, this.player.y, config.RESPAWN_RING_RADIUS)
+      .setStrokeStyle(config.RESPAWN_RING_WIDTH, config.RESPAWN_FLASH_COLOR)
+      .setDepth(9);
+
+    this.tweens.add({
+      targets: ring,
+      scale: config.RESPAWN_RING_SCALE,
+      alpha: 0,
+      duration: config.RESPAWN_RING_MS,
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  // игрок на мгновение закрашивается одним цветом
+  private flashPlayer(color: number, durationMs: number): void {
+    this.player.setTint(color).setTintMode(Phaser.TintModes.FILL);
+    this.time.delayedCall(durationMs, () => this.player.clearTint());
+  }
+
+  // при любой потере жизни потерянное сердце на мгновение увеличивается
+  private popLostHeart(): void {
     const lostHeart = this.hearts[this.lives];
     if (lostHeart) {
       this.tweens.add({
