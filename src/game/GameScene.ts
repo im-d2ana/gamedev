@@ -24,7 +24,7 @@ export class GameScene extends Phaser.Scene {
     Phaser.Input.Keyboard.Key
   >;
 
-  private scoreText!: Phaser.GameObjects.Text;
+  private scoreDigits: Phaser.GameObjects.Image[] = [];
   private statusText!: Phaser.GameObjects.Text;
 
   private score = 0;
@@ -32,7 +32,7 @@ export class GameScene extends Phaser.Scene {
 
   private lives = 0;
   private invulnerable = false;
-  private livesText!: Phaser.GameObjects.Text;
+  private hearts: Phaser.GameObjects.Image[] = [];
 
   private isPaused = false;
   private pauseText!: Phaser.GameObjects.Text;
@@ -125,26 +125,9 @@ export class GameScene extends Phaser.Scene {
       .setDepth(100)
       .setScrollFactor(0);
 
-    this.scoreText = this.add.text(24, 24, 'Score: 0', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '22px',
-      color: '#ffffff',
-      stroke: config.HUD_STROKE_COLOR,
-      strokeThickness: config.HUD_STROKE_THICKNESS,
-    })
-    .setDepth(100)
-    .setScrollFactor(0);
-
-    this.livesText = this.add
-      .text(24, 54, `Lives: ${this.lives}`, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '22px',
-        color: '#ffffff',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.HUD_STROKE_THICKNESS,
-    })
-    .setDepth(100)
-    .setScrollFactor(0);
+    this.scoreDigits = [];
+    this.updateScore();
+    this.createHearts(width);
 
     this.statusText = this.add
       .text(width / 2, height / 2, '', {
@@ -201,7 +184,7 @@ export class GameScene extends Phaser.Scene {
         platform.setData('used', true);
 
         this.score += 1;
-        this.scoreText.setText(`Score: ${this.score}`);
+        this.updateScore();
 
         if (this.phase === 1 && this.score >= config.PHASE_2_SCORE) {
           this.startPhase2();
@@ -253,6 +236,58 @@ export class GameScene extends Phaser.Scene {
     this.removePlatformsBelow();
     this.enemies.removeBelow(this.removeLimitY());
     this.checkFall();
+  }
+
+  // очки рисуются цифрами из набора; новые цифры добавляются, когда число становится длиннее
+  private updateScore(): void {
+    const digits = String(this.score);
+    const step = config.TILE_SIZE * config.SPRITE_SCALE;
+
+    while (this.scoreDigits.length < digits.length) {
+      const digit = this.add
+        .image(
+          config.HUD_MARGIN + this.scoreDigits.length * step,
+          config.HUD_MARGIN,
+          config.TILE_SHEET_KEY,
+          config.DIGIT_FIRST_FRAME,
+        )
+        .setOrigin(0, 0)
+        .setScale(config.SPRITE_SCALE)
+        .setDepth(100)
+        .setScrollFactor(0);
+
+      this.scoreDigits.push(digit);
+    }
+
+    digits.split('').forEach((char, index) => {
+      this.scoreDigits[index].setFrame(config.DIGIT_FIRST_FRAME + Number(char));
+    });
+  }
+
+  // жизни: полное сердце — жизнь есть, пустое — потеряна (теряются справа налево)
+  private createHearts(width: number): void {
+    const size = config.TILE_SIZE * config.SPRITE_SCALE;
+    const total = config.PLAYER_LIVES * size + (config.PLAYER_LIVES - 1) * config.HEART_GAP;
+    const startX = width - config.HUD_MARGIN - total;
+
+    this.hearts = [];
+
+    for (let index = 0; index < config.PLAYER_LIVES; index++) {
+      const heart = this.add
+        .image(startX + index * (size + config.HEART_GAP), config.HUD_MARGIN, config.TILE_SHEET_KEY, config.HEART_FULL_FRAME)
+        .setOrigin(0, 0)
+        .setScale(config.SPRITE_SCALE)
+        .setDepth(100)
+        .setScrollFactor(0);
+
+      this.hearts.push(heart);
+    }
+  }
+
+  private updateHearts(): void {
+    this.hearts.forEach((heart, index) => {
+      heart.setFrame(index < this.lives ? config.HEART_FULL_FRAME : config.HEART_EMPTY_FRAME);
+    });
   }
 
   private createPlayer(): void {
@@ -510,7 +545,7 @@ export class GameScene extends Phaser.Scene {
     // возвращает true, если игрок ещё жив
   private loseLife(message: string): boolean {
     this.lives -= 1;
-    this.livesText.setText(`Lives: ${Math.max(this.lives, 0)}`);
+    this.updateHearts();
 
     if (this.lives <= 0) {
       this.endGame(message);

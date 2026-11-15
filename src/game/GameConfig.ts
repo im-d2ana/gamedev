@@ -81,5 +81,14 @@ export const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.8;
 export const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
 
 export const PLAYER_LIVES = 3;
+
+// сердечки жизней в правом верхнем углу (кадры листа tilemap_packed.png)
+export const HEART_FULL_FRAME = 44;
+export const HEART_EMPTY_FRAME = 46;
+export const HEART_GAP = 4;
+export const HUD_MARGIN = 24;
+
+// цифры очков: кадр 170 — «0», дальше по порядку до 179 — «9»
+export const DIGIT_FIRST_FRAME = 170;
 export const INVULNERABLE_MS = 1500;
 export const RESPAWN_BOTTOM_MARGIN = 60;
