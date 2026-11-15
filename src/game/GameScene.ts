@@ -16,6 +16,7 @@ export class GameScene extends Phaser.Scene {
   private highestPlatformX = 0;
 
   private levelGenerator!: LevelGenerator;
+  private background!: Phaser.GameObjects.TileSprite;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<
@@ -54,12 +55,17 @@ export class GameScene extends Phaser.Scene {
       frameWidth: config.CHARACTER_SIZE,
       frameHeight: config.CHARACTER_SIZE,
     });
+    this.load.spritesheet(config.BACKGROUND_SHEET_KEY, 'tilemap-backgrounds_packed.png', {
+      frameWidth: config.BACKGROUND_TILE_SIZE,
+      frameHeight: config.BACKGROUND_TILE_SIZE,
+    });
   }
 
   create(): void {
     // пиксельная графика без сглаживания (текст при этом остаётся гладким)
     this.textures.get(config.TILE_SHEET_KEY).setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.textures.get(config.CHARACTER_SHEET_KEY).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get(config.BACKGROUND_SHEET_KEY).setFilter(Phaser.Textures.FilterMode.NEAREST);
 
     this.score = 0;
     this.gameOver = false;
@@ -76,11 +82,20 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.levelGenerator = new LevelGenerator(width);
 
+    this.background = this.add
+      .tileSprite(0, 0, width, height, config.BACKGROUND_SHEET_KEY, config.BACKGROUND_FRAME)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(-10)
+      .setTileScale(config.SPRITE_SCALE);
+
     this.add
       .text(width / 2, 20, 'PLATFORM JUMP', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '28px',
         color: '#ffffff',
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.HUD_STROKE_THICKNESS,
       })
       .setOrigin(0.5, 0)
       .setDepth(100)
@@ -90,7 +105,9 @@ export class GameScene extends Phaser.Scene {
       .text(width / 2, 58, '← → или A D — движение   |   P — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
-          color: '#cbd5e1',
+          color: '#e2e8f0',
+          stroke: config.HUD_STROKE_COLOR,
+          strokeThickness: config.HUD_STROKE_THICKNESS,
       })
       .setOrigin(0.5, 0)
       .setDepth(100)
@@ -100,7 +117,9 @@ export class GameScene extends Phaser.Scene {
       .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
-          color: '#94a3b8',
+          color: '#e2e8f0',
+          stroke: config.HUD_STROKE_COLOR,
+          strokeThickness: config.HUD_STROKE_THICKNESS,
       })
       .setOrigin(0.5, 0)
       .setDepth(100)
@@ -110,6 +129,8 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'system-ui, sans-serif',
       fontSize: '22px',
       color: '#ffffff',
+      stroke: config.HUD_STROKE_COLOR,
+      strokeThickness: config.HUD_STROKE_THICKNESS,
     })
     .setDepth(100)
     .setScrollFactor(0);
@@ -119,6 +140,8 @@ export class GameScene extends Phaser.Scene {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '22px',
         color: '#ffffff',
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.HUD_STROKE_THICKNESS,
     })
     .setDepth(100)
     .setScrollFactor(0);
@@ -128,6 +151,8 @@ export class GameScene extends Phaser.Scene {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '32px',
         color: '#ffffff',
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.HUD_STROKE_THICKNESS,
         align: 'center',
       })
       .setOrigin(0.5)
@@ -223,6 +248,7 @@ export class GameScene extends Phaser.Scene {
     this.handleMovement();
     this.enemies.update();
     this.updateCamera();
+    this.background.tilePositionY = this.cameras.main.scrollY * config.BACKGROUND_PARALLAX;
     this.generatePlatformsAbove();
     this.removePlatformsBelow();
     this.enemies.removeBelow(this.removeLimitY());

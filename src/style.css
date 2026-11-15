@@ -9,7 +9,7 @@
     sans-serif;
 
   color: #fff7ed;
-  background: #2e1065;
+  background: #1f4a60;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -29,7 +29,7 @@ body,
 
 body {
   overflow: hidden;
-  background: #2e1065;
+  background: radial-gradient(circle at 50% 30%, #2f6f86 0%, #1f4a60 55%, #12303f 100%);
 }
 
 #app {
@@ -39,18 +39,18 @@ body {
 }
 
 #game {
-  width: min(100%, 960px);
-  height: min(100%, 640px);
-  min-height: 320px;
+  /* поле всегда 3:2 (как игра 960x640), чтобы по бокам не оставалось пустых полос */
+  width: min(100%, 960px, calc((100vh - 32px) * 1.5));
+  aspect-ratio: 3 / 2;
 
   border-radius: 16px;
   overflow: hidden;
 
-  border: 3px solid #a855f7;
-
+  /* рамка нарисована тенью снаружи, поэтому не отнимает место у игры */
   box-shadow:
-    0 0 25px rgb(168 85 247 / 35%),
-    0 16px 48px rgb(15 23 42 / 60%);
+    0 0 0 4px #434a5f,
+    0 0 32px 4px rgb(11 31 43 / 55%),
+    0 16px 48px rgb(0 0 0 / 50%);
 }
 
 canvas {

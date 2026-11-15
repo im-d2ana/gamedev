@@ -1,7 +1,7 @@
 export const PLAYER_SPEED = 400;
 export const JUMP_SPEED = 520;
 
-// графика
+// --- графика (Kenney Pixel Platformer) ---
 export const SPRITE_SCALE = 2;
 
 export const TILE_SHEET_KEY = 'tiles';
@@ -15,8 +15,19 @@ export const ASSETS_PATH = 'assets/kenney-pixel-platformer';
 // номера кадров в листах tilemap_packed.png и tilemap-characters_packed.png
 export const PLAYER_FRAME = 4;
 export const ENEMY_FRAME = 24;
-export const PLATFORM_FRAMES = [16, 17, 18, 19];
-export const DISAPPEARING_PLATFORM_FRAMES = [12, 13, 14, 15];
+// платформа = левый край, две середины, правый край
+export const PLATFORM_FRAMES = [1, 2, 2, 3];
+export const DISAPPEARING_PLATFORM_FRAMES = [13, 14, 14, 15];
+
+// --- фон: готовая плитка из набора, повторяется и медленно сдвигается вслед за камерой ---
+export const BACKGROUND_SHEET_KEY = 'backgrounds';
+export const BACKGROUND_TILE_SIZE = 24;
+export const BACKGROUND_FRAME = 16;
+export const BACKGROUND_PARALLAX = 0.3;
+
+// обводка текста, чтобы он читался и на светлом небе, и на облаках
+export const HUD_STROKE_COLOR = '#161236';
+export const HUD_STROKE_THICKNESS = 4;
 
 export const PLATFORM_TILES = PLATFORM_FRAMES.length;
 export const PLATFORM_WIDTH = TILE_SIZE * SPRITE_SCALE * PLATFORM_TILES;
