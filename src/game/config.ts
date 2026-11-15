@@ -22,6 +22,7 @@ export function createGame(parent: string): Phaser.Game {
           x: 0,
           y: 900,
         },
+        fixedStep: false,
         debug: false,
       },
     },

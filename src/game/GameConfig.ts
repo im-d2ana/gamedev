@@ -1,7 +1,6 @@
 export const PLAYER_SPEED = 400;
 export const JUMP_SPEED = 520;
 
-// --- графика (Kenney Pixel Platformer) ---
 export const SPRITE_SCALE = 2;
 
 export const TILE_SHEET_KEY = 'tiles';
@@ -12,20 +11,16 @@ export const CHARACTER_SIZE = 24;
 
 export const ASSETS_PATH = 'assets/kenney-pixel-platformer';
 
-// номера кадров в листах tilemap_packed.png и tilemap-characters_packed.png
 export const PLAYER_FRAME = 4;
-export const ENEMY_FRAME = 24;
-// платформа = левый край, две середины, правый край
+export const ENEMY_FRAME = 8;
 export const PLATFORM_FRAMES = [1, 2, 2, 3];
 export const DISAPPEARING_PLATFORM_FRAMES = [13, 14, 14, 15];
 
-// --- фон: готовая плитка из набора, повторяется и медленно сдвигается вслед за камерой ---
 export const BACKGROUND_SHEET_KEY = 'backgrounds';
 export const BACKGROUND_TILE_SIZE = 24;
 export const BACKGROUND_FRAME = 16;
 export const BACKGROUND_PARALLAX = 0.3;
 
-// обводка текста, чтобы он читался и на светлом небе, и на облаках
 export const HUD_STROKE_COLOR = '#161236';
 export const HUD_STROKE_THICKNESS = 4;
 
@@ -82,13 +77,11 @@ export const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
 
 export const PLAYER_LIVES = 3;
 
-// сердечки жизней в правом верхнем углу (кадры листа tilemap_packed.png)
 export const HEART_FULL_FRAME = 44;
 export const HEART_EMPTY_FRAME = 46;
 export const HEART_GAP = 4;
 export const HUD_MARGIN = 24;
 
-// цифры очков: кадр 170 — «0», дальше по порядку до 179 — «9»
 export const DIGIT_FIRST_FRAME = 170;
 export const INVULNERABLE_MS = 1500;
 export const RESPAWN_BOTTOM_MARGIN = 60;

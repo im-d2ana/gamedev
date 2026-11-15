@@ -78,6 +78,8 @@ export class GameScene extends Phaser.Scene {
     this.highestPlatformX = 0;
     
     this.cameras.main.setScroll(0, 0);
+    // спрайты рисуются по целым пикселям, иначе пиксельная графика «дрожит» при движении
+    this.cameras.main.setRoundPixels(true);
 
     const { width, height } = this.scale;
     this.levelGenerator = new LevelGenerator(width);
@@ -405,7 +407,9 @@ export class GameScene extends Phaser.Scene {
   private updateCamera(): void {
     const camera = this.cameras.main;
 
-    const targetY = this.player.y - camera.height * config.CAMERA_PLAYER_HEIGHT;
+    // позиция берётся из тела: спрайт Phaser подтягивает к телу уже после update(), и камера отставала бы на кадр
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const targetY = body.center.y - camera.height * config.CAMERA_PLAYER_HEIGHT;
 
     if (targetY < camera.scrollY) {
       camera.scrollY = targetY;
