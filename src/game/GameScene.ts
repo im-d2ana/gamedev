@@ -36,8 +36,11 @@ export class GameScene extends Phaser.Scene {
   private hearts: Phaser.GameObjects.Image[] = [];
 
   private isPaused = false;
+  private pauseOverlay!: Phaser.GameObjects.Rectangle;
   private pauseText!: Phaser.GameObjects.Text;
+  private pauseHint!: Phaser.GameObjects.Text;
   private pauseKey!: Phaser.Input.Keyboard.Key;
+  private escKey!: Phaser.Input.Keyboard.Key;
 
   private phase = 1;
 
@@ -106,7 +109,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 58, '← → или A D — движение   |   P — пауза', {
+      .text(width / 2, 58, '← → или A D — движение   |   P или Esc — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -146,14 +149,32 @@ export class GameScene extends Phaser.Scene {
       .setDepth(100)
       .setScrollFactor(0);
 
+    this.pauseOverlay = this.add
+      .rectangle(width / 2, height / 2, width, height, config.PAUSE_OVERLAY_COLOR, config.PAUSE_OVERLAY_ALPHA)
+      .setDepth(190)
+      .setScrollFactor(0)
+      .setVisible(false);
+
     this.pauseText = this.add
-      .text(width / 2, height / 2, 'ПАУЗА', {
+      .text(width / 2, height / 2 - 20, 'ПАУЗА', {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '36px',
+        fontSize: '56px',
         color: '#ffffff',
-        align: 'center',
-        backgroundColor: '#0f172a',
-        padding: { x: 20, y: 12 },
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.PAUSE_TITLE_STROKE_THICKNESS,
+      })
+      .setOrigin(0.5)
+      .setDepth(200)
+      .setScrollFactor(0)
+      .setVisible(false);
+
+    this.pauseHint = this.add
+      .text(width / 2, height / 2 + 40, 'P или Esc — продолжить', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '20px',
+        color: '#e2e8f0',
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.HUD_STROKE_THICKNESS,
       })
       .setOrigin(0.5)
       .setDepth(200)
@@ -221,10 +242,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(): void {
-    if (
-      Phaser.Input.Keyboard.JustDown(this.pauseKey) &&
-      !this.gameOver
-    ) {
+    // обе клавиши читаются всегда, чтобы нажатие не «залипало» до следующего кадра
+    const pausePressed = Phaser.Input.Keyboard.JustDown(this.pauseKey);
+    const escPressed = Phaser.Input.Keyboard.JustDown(this.escKey);
+
+    if ((pausePressed || escPressed) && !this.gameOver) {
       this.togglePause();
     }
 
@@ -483,6 +505,10 @@ export class GameScene extends Phaser.Scene {
     this.pauseKey = this.input.keyboard.addKey(
       Phaser.Input.Keyboard.KeyCodes.P
     );
+
+    this.escKey = this.input.keyboard.addKey(
+      Phaser.Input.Keyboard.KeyCodes.ESC
+    );
   }
 
   // движение игрока и прыжки.
@@ -549,12 +575,16 @@ export class GameScene extends Phaser.Scene {
     if (this.isPaused) {
       this.physics.world.pause();
       this.time.paused = true;
-      this.pauseText.setVisible(true);
+      this.tweens.pauseAll();
     } else {
       this.physics.world.resume();
       this.time.paused = false;
-      this.pauseText.setVisible(false);
+      this.tweens.resumeAll();
     }
+
+    this.pauseOverlay.setVisible(this.isPaused);
+    this.pauseText.setVisible(this.isPaused);
+    this.pauseHint.setVisible(this.isPaused);
   }
 
     // возвращает true, если игрок ещё жив

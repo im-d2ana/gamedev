@@ -1,7 +1,6 @@
 export const PLAYER_SPEED = 500;
 export const JUMP_SPEED = 520;
 
-// --- графика (Kenney Pixel Platformer) ---
 export const SPRITE_SCALE = 2;
 
 export const TILE_SHEET_KEY = 'tiles';
@@ -12,22 +11,22 @@ export const CHARACTER_SIZE = 24;
 
 export const ASSETS_PATH = 'assets/kenney-pixel-platformer';
 
-// номера кадров в листах tilemap_packed.png и tilemap-characters_packed.png
 export const PLAYER_FRAME = 4;
 export const ENEMY_FRAME = 8;
-// платформа = левый край, две середины, правый край
 export const PLATFORM_FRAMES = [1, 2, 2, 3];
 export const DISAPPEARING_PLATFORM_FRAMES = [13, 14, 14, 15];
 
-// --- фон: готовая плитка из набора, повторяется и медленно сдвигается вслед за камерой ---
 export const BACKGROUND_SHEET_KEY = 'backgrounds';
 export const BACKGROUND_TILE_SIZE = 24;
 export const BACKGROUND_FRAME = 16;
 export const BACKGROUND_PARALLAX = 0.3;
 
-// обводка текста, чтобы он читался и на светлом небе, и на облаках
 export const HUD_STROKE_COLOR = '#161236';
 export const HUD_STROKE_THICKNESS = 4;
+
+export const PAUSE_OVERLAY_COLOR = 0x434a5f;
+export const PAUSE_OVERLAY_ALPHA = 0.55;
+export const PAUSE_TITLE_STROKE_THICKNESS = 8;
 
 export const PLATFORM_TILES = PLATFORM_FRAMES.length;
 export const PLATFORM_WIDTH = TILE_SIZE * SPRITE_SCALE * PLATFORM_TILES;
@@ -82,18 +81,15 @@ export const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
 
 export const PLAYER_LIVES = 3;
 
-// сердечки жизней в правом верхнем углу (кадры листа tilemap_packed.png)
 export const HEART_FULL_FRAME = 44;
 export const HEART_EMPTY_FRAME = 46;
 export const HEART_GAP = 4;
 export const HUD_MARGIN = 24;
 
-// цифры очков: кадр 170 — «0», дальше по порядку до 179 — «9»
 export const DIGIT_FIRST_FRAME = 170;
 export const INVULNERABLE_MS = 1500;
 export const RESPAWN_BOTTOM_MARGIN = 60;
 
-// реакция на урон: красная вспышка, мигание на время неуязвимости, тряска экрана, «удар» по сердцу
 export const HIT_FLASH_COLOR = 0xff3b3b;
 export const HIT_FLASH_MS = 150;
 export const HIT_BLINK_MS = 100;
@@ -103,7 +99,6 @@ export const HIT_SHAKE_INTENSITY = 0.008;
 export const HEART_POP_SCALE = 1.6;
 export const HEART_POP_MS = 140;
 
-// возвращение на платформу после падения: зелёная вспышка и расходящееся кольцо (без красного и тряски)
 export const RESPAWN_FLASH_COLOR = 0x36e377;
 export const RESPAWN_FLASH_MS = 200;
 export const RESPAWN_RING_RADIUS = 24;
