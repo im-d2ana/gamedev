@@ -32,6 +32,7 @@ export class GameScene extends Phaser.Scene {
 
   private lives = 0;
   private invulnerable = false;
+  private blinkTween: Phaser.Tweens.Tween | null = null;
   private hearts: Phaser.GameObjects.Image[] = [];
 
   private isPaused = false;
@@ -73,6 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.phase = 1;
     this.lives = config.PLAYER_LIVES;
     this.invulnerable = false;
+    this.blinkTween = null;
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     this.highestPlatformX = 0;
@@ -91,20 +93,20 @@ export class GameScene extends Phaser.Scene {
       .setDepth(-10)
       .setTileScale(config.SPRITE_SCALE);
 
-    this.add
-      .text(width / 2, 20, 'PLATFORM JUMP', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '28px',
-        color: '#ffffff',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.HUD_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(100)
-      .setScrollFactor(0);
+    // this.add
+    //   .text(width / 2, 20, 'PLATFORM JUMP', {
+    //     fontFamily: 'system-ui, sans-serif',
+    //     fontSize: '28px',
+    //     color: '#ffffff',
+    //     stroke: config.HUD_STROKE_COLOR,
+    //     strokeThickness: config.HUD_STROKE_THICKNESS,
+    //   })
+    //   .setOrigin(0.5, 0)
+    //   .setDepth(100)
+    //   .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 58, '← → или A D — движение   |   P — пауза', {
+      .text(width / 2, 20, '← → или A D — движение   |   P — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -116,7 +118,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
+      .text(width / 2, 44, 'Двигайся влево-вправо и попадай на платформы!', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -276,8 +278,12 @@ export class GameScene extends Phaser.Scene {
 
     for (let index = 0; index < config.PLAYER_LIVES; index++) {
       const heart = this.add
-        .image(startX + index * (size + config.HEART_GAP), config.HUD_MARGIN, config.TILE_SHEET_KEY, config.HEART_FULL_FRAME)
-        .setOrigin(0, 0)
+        .image(
+          startX + index * (size + config.HEART_GAP) + size / 2,
+          config.HUD_MARGIN + size / 2,
+          config.TILE_SHEET_KEY,
+          config.HEART_FULL_FRAME,
+        )
         .setScale(config.SPRITE_SCALE)
         .setDepth(100)
         .setScrollFactor(0);
@@ -550,6 +556,7 @@ export class GameScene extends Phaser.Scene {
   private loseLife(message: string): boolean {
     this.lives -= 1;
     this.updateHearts();
+    this.playHitEffect();
 
     if (this.lives <= 0) {
       this.endGame(message);
@@ -557,17 +564,54 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.invulnerable = true;
-    this.player.setAlpha(0.5);
+    this.startBlink();
 
     this.time.delayedCall(config.INVULNERABLE_MS, () => {
       if (this.gameOver) {
         return;
       }
       this.invulnerable = false;
-      this.player.setAlpha(1);
+      this.stopBlink();
     });
 
     return true;
+  }
+
+  // заметная реакция на урон: красный силуэт, тряска экрана и «удар» по потерянному сердцу
+  private playHitEffect(): void {
+    this.player.setTint(config.HIT_FLASH_COLOR).setTintMode(Phaser.TintModes.FILL);
+    this.time.delayedCall(config.HIT_FLASH_MS, () => this.player.clearTint());
+
+    this.cameras.main.shake(config.HIT_SHAKE_MS, config.HIT_SHAKE_INTENSITY);
+
+    const lostHeart = this.hearts[this.lives];
+    if (lostHeart) {
+      this.tweens.add({
+        targets: lostHeart,
+        scale: config.SPRITE_SCALE * config.HEART_POP_SCALE,
+        duration: config.HEART_POP_MS,
+        yoyo: true,
+      });
+    }
+  }
+
+  // пока игрок неуязвим, он мигает
+  private startBlink(): void {
+    this.stopBlink();
+
+    this.blinkTween = this.tweens.add({
+      targets: this.player,
+      alpha: config.HIT_BLINK_ALPHA,
+      duration: config.HIT_BLINK_MS,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private stopBlink(): void {
+    this.blinkTween?.stop();
+    this.blinkTween = null;
+    this.player.setAlpha(1);
   }
 
   // ставит игрока на самую нижнюю видимую платформу
@@ -607,6 +651,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.gameOver = true;
+    this.stopBlink();
 
     const resultText =
       `${message}\n\n` +
