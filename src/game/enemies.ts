@@ -38,7 +38,7 @@ export class Enemies {
   // движение врагов туда-обратно в пределах патруля
   update(): void {
     this.group.children.forEach((child: Phaser.GameObjects.GameObject) => {
-      const enemy = child as Phaser.GameObjects.Arc;
+      const enemy = child as Phaser.GameObjects.Sprite;
 
       if (!enemy.active) {
         return;
@@ -58,10 +58,10 @@ export class Enemies {
   }
 
   removeBelow(limitY: number): void {
-    const outdated: Phaser.GameObjects.Arc[] = [];
+    const outdated: Phaser.GameObjects.Sprite[] = [];
 
     for (const child of this.group.children.values()) {
-      const enemy = child as Phaser.GameObjects.Arc;
+      const enemy = child as Phaser.GameObjects.Sprite;
 
       if (enemy.y > limitY) {
         outdated.push(enemy);
@@ -76,18 +76,23 @@ export class Enemies {
   // уже существующие враги тоже ускоряются при переходе в фазу 2
   speedUpForPhase2(): void {
     this.group.children.forEach((child: Phaser.GameObjects.GameObject) => {
-      const body = (child as Phaser.GameObjects.Arc).body as Phaser.Physics.Arcade.Body;
+      const body = (child as Phaser.GameObjects.Sprite).body as Phaser.Physics.Arcade.Body;
       body.setVelocityX(body.velocity.x * config.PHASE_2_ENEMY_SPEED_MULTIPLIER);
     });
   }
 
   private add(x: number, y: number, phase: number): void {
-    const enemy = this.scene.add.circle(x, y, config.ENEMY_RADIUS, 0xef4444);
+    const enemy = this.scene.add
+      .sprite(x, y, config.CHARACTER_SHEET_KEY, config.ENEMY_FRAME)
+      .setScale(config.SPRITE_SCALE)
+      .setDepth(5);
 
     this.group.add(enemy);
 
     const body = enemy.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
+    // размер тела задаётся в пикселях исходного кадра, поэтому делим на масштаб
+    body.setSize((config.ENEMY_RADIUS * 2) / config.SPRITE_SCALE, (config.ENEMY_RADIUS * 2) / config.SPRITE_SCALE);
     body.setVelocityX(this.speed(phase));
 
     const minX = Math.max(config.ENEMY_RADIUS, x - config.ENEMY_PATROL_RANGE);

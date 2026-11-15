@@ -1,7 +1,25 @@
 export const PLAYER_SPEED = 400;
 export const JUMP_SPEED = 520;
 
-export const PLATFORM_WIDTH = 150;
+// графика
+export const SPRITE_SCALE = 2;
+
+export const TILE_SHEET_KEY = 'tiles';
+export const TILE_SIZE = 18;
+
+export const CHARACTER_SHEET_KEY = 'characters';
+export const CHARACTER_SIZE = 24;
+
+export const ASSETS_PATH = 'assets/kenney-pixel-platformer';
+
+// номера кадров в листах tilemap_packed.png и tilemap-characters_packed.png
+export const PLAYER_FRAME = 4;
+export const ENEMY_FRAME = 24;
+export const PLATFORM_FRAMES = [16, 17, 18, 19];
+export const DISAPPEARING_PLATFORM_FRAMES = [12, 13, 14, 15];
+
+export const PLATFORM_TILES = PLATFORM_FRAMES.length;
+export const PLATFORM_WIDTH = TILE_SIZE * SPRITE_SCALE * PLATFORM_TILES;
 export const PLATFORM_HEIGHT = 20;
 
 export const PLAYER_SIZE = 38;

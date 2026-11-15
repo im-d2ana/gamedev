@@ -6,7 +6,7 @@ import { Enemies } from './enemies';
 import { LevelGenerator, pickDisappearingSlots } from './LevelGenerator';
 
 export class GameScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Triangle;
+  private player!: Phaser.GameObjects.Sprite;
 
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private enemies!: Enemies;
@@ -43,7 +43,24 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
+  preload(): void {
+    this.load.setPath(config.ASSETS_PATH);
+
+    this.load.spritesheet(config.TILE_SHEET_KEY, 'tilemap_packed.png', {
+      frameWidth: config.TILE_SIZE,
+      frameHeight: config.TILE_SIZE,
+    });
+    this.load.spritesheet(config.CHARACTER_SHEET_KEY, 'tilemap-characters_packed.png', {
+      frameWidth: config.CHARACTER_SIZE,
+      frameHeight: config.CHARACTER_SIZE,
+    });
+  }
+
   create(): void {
+    // пиксельная графика без сглаживания (текст при этом остаётся гладким)
+    this.textures.get(config.TILE_SHEET_KEY).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get(config.CHARACTER_SHEET_KEY).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
     this.score = 0;
     this.gameOver = false;
     this.isPaused = false;
@@ -94,6 +111,7 @@ export class GameScene extends Phaser.Scene {
       fontSize: '22px',
       color: '#ffffff',
     })
+    .setDepth(100)
     .setScrollFactor(0);
 
     this.livesText = this.add
@@ -102,6 +120,7 @@ export class GameScene extends Phaser.Scene {
         fontSize: '22px',
         color: '#ffffff',
     })
+    .setDepth(100)
     .setScrollFactor(0);
 
     this.statusText = this.add
@@ -170,6 +189,7 @@ export class GameScene extends Phaser.Scene {
             }
 
             platform.setVisible(false);
+            this.platformTiles(platform).forEach((tile) => tile.setVisible(false));
             const body = platform.body as Phaser.Physics.Arcade.StaticBody;
             body.enable = false;
           });
@@ -210,19 +230,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPlayer(): void {
-    this.player = this.add.triangle(
-      120, config.START_Y - config.PLAYER_SIZE,
-      0, config.PLAYER_SIZE,
-      config.PLAYER_SIZE, config.PLAYER_SIZE,
-      config.PLAYER_SIZE / 2, 0,
-      0x38bdf8,
-    );
+    this.player = this.add
+      .sprite(120, config.START_Y - config.PLAYER_SIZE, config.CHARACTER_SHEET_KEY, config.PLAYER_FRAME)
+      .setScale(config.SPRITE_SCALE)
+      .setDepth(10);
 
     this.physics.add.existing(this.player);
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
 
-    body.setSize(config.PLAYER_SIZE, config.PLAYER_SIZE);
+    // размер тела задаётся в пикселях исходного кадра, поэтому делим на масштаб
+    body.setSize(config.PLAYER_SIZE / config.SPRITE_SCALE, config.PLAYER_SIZE / config.SPRITE_SCALE);
     body.setAllowGravity(true);
     body.setCollideWorldBounds(false);
   }
@@ -242,14 +260,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addPlatform(x: number, y: number, disappearing: boolean): void {
-    const color = disappearing ? 0xf97316 : 0x22c55e;
-
+    // прозрачный прямоугольник отвечает за физику, картинка рисуется из тайлов отдельно
     const platform = this.add.rectangle(
       x,
       y,
       config.PLATFORM_WIDTH,
       config.PLATFORM_HEIGHT,
-      color,
+      0x000000,
+      0,
     );
 
     this.platforms.add(platform);
@@ -259,12 +277,42 @@ export class GameScene extends Phaser.Scene {
 
     platform.setData('disappearing', disappearing);
     platform.setData('used', false);
+    platform.setData('tiles', this.createPlatformTiles(platform, disappearing));
 
     // обновление самой высокой платформы
     if (y < this.highestPlatformY) {
       this.highestPlatformY = y;
       this.highestPlatformX = x;
     }
+  }
+
+  // картинка платформы: ряд тайлов, верхний край совпадает с верхом физического тела
+  private createPlatformTiles(
+    platform: Phaser.GameObjects.Rectangle,
+    disappearing: boolean,
+  ): Phaser.GameObjects.Image[] {
+    const frames = disappearing ? config.DISAPPEARING_PLATFORM_FRAMES : config.PLATFORM_FRAMES;
+    const tileSize = config.TILE_SIZE * config.SPRITE_SCALE;
+    const left = platform.x - config.PLATFORM_WIDTH / 2;
+    const top = platform.y - config.PLATFORM_HEIGHT / 2;
+
+    const tiles = frames.map((frame, index) =>
+      this.add
+        .image(left + index * tileSize, top, config.TILE_SHEET_KEY, frame)
+        .setOrigin(0, 0)
+        .setScale(config.SPRITE_SCALE),
+    );
+
+    // когда платформа удаляется, вместе с ней удаляется и её картинка
+    platform.once(Phaser.GameObjects.Events.DESTROY, () => {
+      tiles.forEach((tile) => tile.destroy());
+    });
+
+    return tiles;
+  }
+
+  private platformTiles(platform: Phaser.GameObjects.Rectangle): Phaser.GameObjects.Image[] {
+    return platform.getData('tiles') as Phaser.GameObjects.Image[];
   }
 
   // генерация новых платформ
