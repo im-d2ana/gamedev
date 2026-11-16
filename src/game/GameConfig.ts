@@ -1,4 +1,4 @@
-export const PLAYER_SPEED = 500;
+export const PLAYER_SPEED = 400;
 export const JUMP_SPEED = 520;
 
 export const SPRITE_SCALE = 2;
@@ -20,6 +20,15 @@ export const BACKGROUND_SHEET_KEY = 'backgrounds';
 export const BACKGROUND_TILE_SIZE = 24;
 export const BACKGROUND_FRAME = 16;
 export const BACKGROUND_PARALLAX = 0.3;
+
+export const CLOUD_FRAME_LEFT = 153;
+export const CLOUD_FRAME_MIDDLE = 154;
+export const CLOUD_FRAME_RIGHT = 155;
+export const CLOUD_COUNT = 6;
+export const CLOUD_ALPHA = 0.4;
+export const CLOUD_PARALLAX_MIN = 0.15;
+export const CLOUD_PARALLAX_MAX = 0.35;
+export const CLOUD_RESPAWN_RANGE = 200;
 
 export const HUD_STROKE_COLOR = '#161236';
 export const HUD_STROKE_THICKNESS = 4;

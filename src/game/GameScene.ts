@@ -17,6 +17,7 @@ export class GameScene extends Phaser.Scene {
 
   private levelGenerator!: LevelGenerator;
   private background!: Phaser.GameObjects.TileSprite;
+  private clouds: { parts: Phaser.GameObjects.Image[]; factor: number }[] = [];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<
@@ -96,8 +97,22 @@ export class GameScene extends Phaser.Scene {
       .setDepth(-10)
       .setTileScale(config.SPRITE_SCALE);
 
+    this.createClouds(height);
+
     this.add
-      .text(width / 2, 20, '← → или A D — движение   |   P или Esc — пауза', {
+      .text(width / 2, 20, 'PLATFORM JUMP', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '28px',
+        color: '#ffffff',
+        stroke: config.HUD_STROKE_COLOR,
+        strokeThickness: config.HUD_STROKE_THICKNESS,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(100)
+      .setScrollFactor(0);
+
+    this.add
+      .text(width / 2, 58, '← → или A D — движение   |   P или Esc — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -109,7 +124,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 44, 'Двигайся влево-вправо и попадай на платформы!', {
+      .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -246,10 +261,61 @@ export class GameScene extends Phaser.Scene {
     this.enemies.update();
     this.updateCamera();
     this.background.tilePositionY = this.cameras.main.scrollY * config.BACKGROUND_PARALLAX;
+    this.updateClouds();
     this.generatePlatformsAbove();
     this.removePlatformsBelow();
     this.enemies.removeBelow(this.removeLimitY());
     this.checkFall();
+  }
+
+  // облака двигаются медленнее платформ (параллакс), поэтому видно, что игрок набирает высоту
+  private createClouds(height: number): void {
+    this.clouds = [];
+
+    for (let i = 0; i < config.CLOUD_COUNT; i++) {
+      const factor = Phaser.Math.FloatBetween(config.CLOUD_PARALLAX_MIN, config.CLOUD_PARALLAX_MAX);
+      const frames = [
+        config.CLOUD_FRAME_LEFT,
+        ...new Array<number>(Phaser.Math.Between(1, 3)).fill(config.CLOUD_FRAME_MIDDLE),
+        config.CLOUD_FRAME_RIGHT,
+      ];
+
+      const parts = frames.map((frame) =>
+        this.add
+          .image(0, 0, config.TILE_SHEET_KEY, frame)
+          .setOrigin(0, 0)
+          .setScale(config.SPRITE_SCALE)
+          .setAlpha(config.CLOUD_ALPHA)
+          .setDepth(-5)
+          .setScrollFactor(0, factor),
+      );
+
+      this.placeCloud(parts, Phaser.Math.Between(0, height));
+      this.clouds.push({ parts, factor });
+    }
+  }
+
+  private placeCloud(parts: Phaser.GameObjects.Image[], y: number): void {
+    const tileSize = config.TILE_SIZE * config.SPRITE_SCALE;
+    const x = Phaser.Math.Between(0, this.scale.width - parts.length * tileSize);
+
+    parts.forEach((part, index) => part.setPosition(x + index * tileSize, y));
+  }
+
+  // облако, ушедшее за нижний край экрана, возвращается над верхним краем
+  private updateClouds(): void {
+    const camera = this.cameras.main;
+    const tileSize = config.TILE_SIZE * config.SPRITE_SCALE;
+
+    for (const cloud of this.clouds) {
+      const screenY = cloud.parts[0].y - camera.scrollY * cloud.factor;
+
+      if (screenY > camera.height) {
+        const aboveTop = camera.scrollY * cloud.factor - tileSize;
+
+        this.placeCloud(cloud.parts, aboveTop - Phaser.Math.Between(0, config.CLOUD_RESPAWN_RANGE));
+      }
+    }
   }
 
   // очки рисуются цифрами из набора; новые цифры добавляются, когда число становится длиннее
