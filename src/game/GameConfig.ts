@@ -13,8 +13,8 @@ export const ASSETS_PATH = 'assets/kenney-pixel-platformer';
 
 export const PLAYER_FRAME = 4;
 export const ENEMY_FRAME = 8;
-export const PLATFORM_FRAMES = [1, 2, 2, 3];
-export const DISAPPEARING_PLATFORM_FRAMES = [13, 14, 14, 15];
+export const PLATFORM_FRAMES = [1, 2, 3];
+export const DISAPPEARING_PLATFORM_FRAMES = [13, 14, 15];
 
 export const BACKGROUND_SHEET_KEY = 'backgrounds';
 export const BACKGROUND_TILE_SIZE = 24;
