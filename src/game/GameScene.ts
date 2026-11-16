@@ -97,19 +97,7 @@ export class GameScene extends Phaser.Scene {
       .setTileScale(config.SPRITE_SCALE);
 
     this.add
-      .text(width / 2, 20, 'PLATFORM JUMP', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '28px',
-        color: '#ffffff',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.HUD_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(100)
-      .setScrollFactor(0);
-
-    this.add
-      .text(width / 2, 58, '← → или A D — движение   |   P или Esc — пауза', {
+      .text(width / 2, 20, '← → или A D — движение   |   P или Esc — пауза', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
@@ -121,7 +109,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.add
-      .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
+      .text(width / 2, 44, 'Двигайся влево-вправо и попадай на платформы!', {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '16px',
           color: '#e2e8f0',
