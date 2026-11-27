@@ -1,23 +1,17 @@
 import Phaser from 'phaser';
 
 import * as config from './GameConfig';
-import { disappearingChance } from './difficulty';
 import { Enemies } from './enemies';
 import { Hud } from './Hud';
-import { LevelGenerator, pickDisappearingSlots } from './LevelGenerator';
+import { Platforms } from './Platforms';
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
 
-  private platforms!: Phaser.Physics.Arcade.StaticGroup;
+  private platforms!: Platforms;
   private enemies!: Enemies;
   private hud!: Hud;
 
-  private highestPlatformY = Number.POSITIVE_INFINITY;
-
-  private highestPlatformX = 0;
-
-  private levelGenerator!: LevelGenerator;
   private background!: Phaser.GameObjects.TileSprite;
   private clouds: { parts: Phaser.GameObjects.Image[]; factor: number }[] = [];
 
@@ -72,15 +66,11 @@ export class GameScene extends Phaser.Scene {
     this.invulnerable = false;
     this.blinkTween = null;
 
-    this.highestPlatformY = Number.POSITIVE_INFINITY;
-    this.highestPlatformX = 0;
-
     this.cameras.main.setScroll(0, 0);
     // спрайты рисуются по целым пикселям, иначе пиксельная графика «дрожит» при движении
     this.cameras.main.setRoundPixels(true);
 
     const { width, height } = this.scale;
-    this.levelGenerator = new LevelGenerator(width);
 
     this.background = this.add
       .tileSprite(0, 0, width, height, config.BACKGROUND_SHEET_KEY, config.BACKGROUND_FRAME)
@@ -94,14 +84,14 @@ export class GameScene extends Phaser.Scene {
     this.hud = new Hud(this);
 
     this.createPlayer();
-    this.createPlatforms();
+    this.platforms = new Platforms(this);
     this.enemies = new Enemies(this);
     this.createControls();
 
     // сквозное поведение платформ
     this.physics.add.overlap(
       this.player,
-      this.platforms,
+      this.platforms.group,
       (_player, platformObject) => {
         if (this.gameOver) {
           return;
@@ -128,16 +118,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (platform.getData('disappearing')) {
-          this.time.delayedCall(500, () => {
-            if (!platform.active) {
-              return;
-            }
-
-            platform.setVisible(false);
-            this.platformTiles(platform).forEach((tile) => tile.setVisible(false));
-            const body = platform.body as Phaser.Physics.Arcade.StaticBody;
-            body.enable = false;
-          });
+          this.platforms.scheduleDisappear(platform);
         }
       },
       undefined,
@@ -172,7 +153,7 @@ export class GameScene extends Phaser.Scene {
     this.background.tilePositionY = this.cameras.main.scrollY * config.BACKGROUND_PARALLAX;
     this.updateClouds();
     this.generatePlatformsAbove();
-    this.removePlatformsBelow();
+    this.platforms.removeBelow(this.removeLimitY());
     this.enemies.removeBelow(this.removeLimitY());
     this.checkFall();
   }
@@ -251,102 +232,12 @@ export class GameScene extends Phaser.Scene {
     body.setCollideWorldBounds(false);
   }
 
-  private createPlatforms(): void {
-    this.platforms = this.physics.add.staticGroup();
-
-    this.addPlatform(120, config.START_Y, false);
-    this.addPlatform(350, 470, false);
-    this.addPlatform(600, 390, false);
-    this.addPlatform(820, 310, false);
-    this.addPlatform(620, 220, false);
-    this.addPlatform(350, 160, false);
-    this.addPlatform(700, 100, false);
-
-    this.levelGenerator.reset([this.highestPlatformX]);
-  }
-
-  private addPlatform(x: number, y: number, disappearing: boolean): void {
-    // прозрачный прямоугольник отвечает за физику, картинка рисуется из тайлов отдельно
-    const platform = this.add.rectangle(
-      x,
-      y,
-      config.PLATFORM_WIDTH,
-      config.PLATFORM_HEIGHT,
-      0x000000,
-      0,
-    );
-
-    this.platforms.add(platform);
-
-    const body = platform.body as Phaser.Physics.Arcade.StaticBody;
-    body.updateFromGameObject();
-
-    platform.setData('disappearing', disappearing);
-    platform.setData('used', false);
-    platform.setData('tiles', this.createPlatformTiles(platform, disappearing));
-
-    // обновление самой высокой платформы
-    if (y < this.highestPlatformY) {
-      this.highestPlatformY = y;
-      this.highestPlatformX = x;
-    }
-  }
-
-  // картинка платформы: ряд тайлов, верхний край совпадает с верхом физического тела
-  private createPlatformTiles(
-    platform: Phaser.GameObjects.Rectangle,
-    disappearing: boolean,
-  ): Phaser.GameObjects.Image[] {
-    const frames = disappearing ? config.DISAPPEARING_PLATFORM_FRAMES : config.PLATFORM_FRAMES;
-    const tileSize = config.TILE_SIZE * config.SPRITE_SCALE;
-    const left = platform.x - config.PLATFORM_WIDTH / 2;
-    const top = platform.y - config.PLATFORM_HEIGHT / 2;
-
-    const tiles = frames.map((frame, index) =>
-      this.add
-        .image(left + index * tileSize, top, config.TILE_SHEET_KEY, frame)
-        .setOrigin(0, 0)
-        .setScale(config.SPRITE_SCALE),
-    );
-
-    // когда платформа удаляется, вместе с ней удаляется и её картинка
-    platform.once(Phaser.GameObjects.Events.DESTROY, () => {
-      tiles.forEach((tile) => tile.destroy());
-    });
-
-    return tiles;
-  }
-
-  private platformTiles(platform: Phaser.GameObjects.Rectangle): Phaser.GameObjects.Image[] {
-    return platform.getData('tiles') as Phaser.GameObjects.Image[];
-  }
-
-  // генерация новых платформ
+  // генерация новых платформ и спавн врагов на новых уровнях
   private generatePlatformsAbove(): void {
-    const camera = this.cameras.main;
-    const spawnLimit = camera.scrollY - config.PLATFORM_SPAWN_MARGIN;
+    const spawnLimitY = this.cameras.main.scrollY - config.PLATFORM_SPAWN_MARGIN;
+    const spawnedLevels = this.platforms.generateAbove(spawnLimitY, this.phase);
 
-    while (this.highestPlatformY > spawnLimit) {
-      const previousLevelY = this.highestPlatformY;
-
-      const levelY =
-        previousLevelY - Phaser.Math.Between(config.MIN_LEVEL_GAP, config.MAX_LEVEL_GAP);
-      const count = Phaser.Math.Between(
-        config.MIN_PLATFORMS_PER_LEVEL,
-        config.MAX_PLATFORMS_PER_LEVEL,
-      );
-
-      const positions = this.levelGenerator.nextPositions(count);
-
-      const chance = disappearingChance(levelY, this.phase);
-      const disappearing = pickDisappearingSlots(positions.length, chance);
-
-      positions.forEach((x, index) => {
-        const y = levelY + Phaser.Math.Between(-config.PLATFORM_LEVEL_Y_JITTER, 0);
-
-        this.addPlatform(x, y, disappearing.has(index));
-      });
-
+    for (const { levelY, previousLevelY, positions } of spawnedLevels) {
       this.enemies.spawn(levelY, previousLevelY, positions, this.phase);
     }
   }
@@ -368,45 +259,6 @@ export class GameScene extends Phaser.Scene {
     const camera = this.cameras.main;
 
     return camera.scrollY + camera.height + config.PLATFORM_REMOVE_MARGIN;
-  }
-
-  private removePlatformsBelow(): void {
-    const removeLimit = this.removeLimitY();
-
-    this.platforms.getChildren().forEach((child) => {
-      const platform = child as Phaser.GameObjects.Rectangle;
-
-      if (platform.y > removeLimit) {
-        this.platforms.remove(platform, true, true);
-      }
-    });
-  }
-
-  // платформы выше экрана создавались по правилам фазы 1, поэтому при смене фазы генерируем их заново
-  private regenerateLevelsAbove(): void {
-    const cutoff = this.cameras.main.scrollY - config.PLATFORM_HEIGHT;
-
-    this.platforms
-      .getChildren()
-      .slice()
-      .forEach((child) => {
-        const platform = child as Phaser.GameObjects.Rectangle;
-
-        if (platform.y < cutoff) {
-          this.platforms.remove(platform, true, true);
-        }
-      });
-
-    // самая верхняя из оставшихся платформ снова становится точкой, от которой идёт генерация
-    const remaining = this.platforms.getChildren() as Phaser.GameObjects.Rectangle[];
-    const topY = Math.min(...remaining.map((platform) => platform.y));
-    const topLevelXs = remaining
-      .filter((platform) => platform.y - topY <= config.PLATFORM_LEVEL_Y_JITTER)
-      .map((platform) => platform.x);
-
-    this.highestPlatformY = topY;
-    this.highestPlatformX = topLevelXs[0];
-    this.levelGenerator.reset(topLevelXs);
   }
 
   private createControls(): void {
@@ -473,7 +325,10 @@ export class GameScene extends Phaser.Scene {
   private startPhase2(): void {
     this.phase = 2;
 
-    this.time.delayedCall(0, () => this.regenerateLevelsAbove());
+    this.time.delayedCall(0, () => {
+      const cutoffY = this.cameras.main.scrollY - config.PLATFORM_HEIGHT;
+      this.platforms.regenerateAbove(cutoffY);
+    });
 
     this.enemies.speedUpForPhase2();
 
@@ -581,21 +436,7 @@ export class GameScene extends Phaser.Scene {
   private respawnPlayer(): void {
     const camera = this.cameras.main;
     const limit = camera.scrollY + camera.height - config.RESPAWN_BOTTOM_MARGIN;
-
-    let target: Phaser.GameObjects.Rectangle | null = null;
-
-    for (const child of this.platforms.getChildren()) {
-      const platform = child as Phaser.GameObjects.Rectangle;
-      const body = platform.body as Phaser.Physics.Arcade.StaticBody;
-
-      if (!platform.visible || !body.enable || platform.y > limit) {
-        continue;
-      }
-
-      if (target === null || platform.y > target.y) {
-        target = platform;
-      }
-    }
+    const target = this.platforms.findRespawnTarget(limit);
 
     if (target === null) {
       this.endGame('ТЫ УПАЛ!');

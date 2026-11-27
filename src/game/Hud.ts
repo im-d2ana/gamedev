@@ -15,7 +15,7 @@ export class Hud {
     const { width, height } = scene.scale;
 
     scene.add
-      .text(width / 2, 44, '← → или A D — движение | P или Esc — пауза', {
+      .text(width / 2, 20, '← → или A D — движение | P или Esc — пауза', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '16px',
         color: '#e2e8f0',
