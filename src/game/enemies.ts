@@ -1,11 +1,17 @@
 import Phaser from 'phaser';
 
 import * as config from './GameConfig';
-import { enemyChance } from './Difficulty';
+import {
+  enemyChance,
+  enemyMaxDryLevels,
+  enemyMinGap,
+  maxActiveEnemies,
+} from './Difficulty';
 
 export class Enemies {
   readonly group: Phaser.Physics.Arcade.Group;
   private readonly scene: Phaser.Scene;
+  private levelsSinceLastSpawn = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -13,25 +19,31 @@ export class Enemies {
   }
 
   spawn(levelY: number, previousLevelY: number, platformXs: number[], phase: number): void {
-    if (Math.random() >= enemyChance(levelY, phase)) {
+    const chance = enemyChance(levelY, phase);
+    if (chance <= 0 || platformXs.length === 0) {
+      return;
+    }
+
+    this.levelsSinceLastSpawn += 1;
+
+    if (this.group.getLength() >= maxActiveEnemies(levelY, phase)) {
       return;
     }
 
     const y = Math.round((levelY + previousLevelY) / 2);
+    if (this.hasNearbyEnemy(y, enemyMinGap(levelY))) {
+      return;
+    }
 
-    for (let attempt = 0; attempt < config.ENEMY_POSITION_ATTEMPTS; attempt++) {
-      const x = Phaser.Math.Between(config.ENEMY_RADIUS, this.scene.scale.width - config.ENEMY_RADIUS);
+    const mustSpawn = this.levelsSinceLastSpawn >= enemyMaxDryLevels(levelY);
+    if (!mustSpawn && Math.random() >= chance) {
+      return;
+    }
 
-      // проверка, чтобы враг не находился прямо над платформой
-      const blocksLanding = platformXs.some(
-        (platformX) =>
-          Math.abs(platformX - x) < config.PLATFORM_WIDTH / 2 + config.ENEMY_RADIUS,
-      );
-
-      if (!blocksLanding) {
-        this.add(x, y, phase);
-        return;
-      }
+    const x = this.pickSpawnX(platformXs);
+    if (x !== null) {
+      this.add(x, y, phase);
+      this.levelsSinceLastSpawn = 0;
     }
   }
 
@@ -79,6 +91,46 @@ export class Enemies {
       const body = (child as Phaser.GameObjects.Sprite).body as Phaser.Physics.Arcade.Body;
       body.setVelocityX(body.velocity.x * config.PHASE_2_ENEMY_SPEED_MULTIPLIER);
     });
+  }
+
+  // ставит врага рядом с платформой, чтобы его патруль пересекал подлёт к ней, а не пустой край экрана
+  private pickSpawnX(platformXs: number[]): number | null {
+    const minOffset = config.PLATFORM_WIDTH / 2 + config.ENEMY_RADIUS;
+    const maxOffset = config.PLATFORM_WIDTH / 2 + config.ENEMY_PATROL_RANGE;
+    const minX = config.ENEMY_RADIUS;
+    const maxX = this.scene.scale.width - config.ENEMY_RADIUS;
+
+    for (let attempt = 0; attempt < config.ENEMY_POSITION_ATTEMPTS; attempt++) {
+      const targetX = Phaser.Utils.Array.GetRandom(platformXs);
+      const offset = Phaser.Math.Between(minOffset, maxOffset);
+      const side = Math.random() < 0.5 ? -1 : 1;
+
+      for (const dir of [side, -side]) {
+        const x = targetX + dir * offset;
+        if (x >= minX && x <= maxX && !this.blocksLanding(x, platformXs)) {
+          return x;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private blocksLanding(x: number, platformXs: number[]): boolean {
+    return platformXs.some(
+      (platformX) => Math.abs(platformX - x) < config.PLATFORM_WIDTH / 2 + config.ENEMY_RADIUS,
+    );
+  }
+
+  private hasNearbyEnemy(y: number, minGap: number): boolean {
+    for (const child of this.group.children.values()) {
+      const enemy = child as Phaser.GameObjects.Sprite;
+      if (Math.abs(enemy.y - y) < minGap) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private add(x: number, y: number, phase: number): void {

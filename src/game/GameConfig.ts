@@ -65,21 +65,27 @@ export const DISAPPEARING_CHANCE_MAX = 0.55;
 export const DISAPPEARING_FULL_HEIGHT = 30000;
 export const DISAPPEARING_PLATFORM_DELAY_MS = 500;
 
-export const ENEMY_CHANCE = 0.1;
-export const ENEMY_CHANCE_MAX = 0.3;
-export const ENEMY_START_HEIGHT = 400;
-export const ENEMY_FULL_HEIGHT = 32000;
+export const ENEMY_CHANCE = 0.16;
+export const ENEMY_CHANCE_MAX = 0.4;
+export const ENEMY_START_HEIGHT = 600;
+export const ENEMY_FULL_HEIGHT = 24000;
 export const ENEMY_RADIUS = 16;
 export const ENEMY_SPEED = 90;
 export const ENEMY_PATROL_RANGE = 90;
 export const ENEMY_POSITION_ATTEMPTS = 40;
+export const ENEMY_MAX_ACTIVE_START = 2;
+export const ENEMY_MAX_ACTIVE_END = 5;
+export const ENEMY_MIN_GAP_START = 240;
+export const ENEMY_MIN_GAP_END = 140;
+export const ENEMY_MAX_DRY_LEVELS_START = 5;
+export const ENEMY_MAX_DRY_LEVELS_END = 2;
 
 export const CAMERA_PLAYER_HEIGHT = 0.4;
 export const PHASE_2_SCORE = 10;
 export const HAZARDS_START_PHASE = 2;
 export const PHASE_BANNER_MS = 2000;
 export const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;
-export const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.8;
+export const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.4;
 export const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
 
 export const PLAYER_LIVES = 3;
