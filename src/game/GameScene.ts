@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import * as config from './GameConfig';
 import { disappearingChance } from './difficulty';
 import { Enemies } from './enemies';
+import { Hud } from './Hud';
 import { LevelGenerator, pickDisappearingSlots } from './LevelGenerator';
 
 export class GameScene extends Phaser.Scene {
@@ -10,6 +11,7 @@ export class GameScene extends Phaser.Scene {
 
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private enemies!: Enemies;
+  private hud!: Hud;
 
   private highestPlatformY = Number.POSITIVE_INFINITY;
 
@@ -20,13 +22,7 @@ export class GameScene extends Phaser.Scene {
   private clouds: { parts: Phaser.GameObjects.Image[]; factor: number }[] = [];
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: Record<
-    'left' | 'right',
-    Phaser.Input.Keyboard.Key
-  >;
-
-  private scoreDigits: Phaser.GameObjects.Image[] = [];
-  private statusText!: Phaser.GameObjects.Text;
+  private wasd!: Record<'left' | 'right', Phaser.Input.Keyboard.Key>;
 
   private score = 0;
   private gameOver = false;
@@ -34,12 +30,8 @@ export class GameScene extends Phaser.Scene {
   private lives = 0;
   private invulnerable = false;
   private blinkTween: Phaser.Tweens.Tween | null = null;
-  private hearts: Phaser.GameObjects.Image[] = [];
 
   private isPaused = false;
-  private pauseOverlay!: Phaser.GameObjects.Rectangle;
-  private pauseText!: Phaser.GameObjects.Text;
-  private pauseHint!: Phaser.GameObjects.Text;
   private pauseKey!: Phaser.Input.Keyboard.Key;
   private escKey!: Phaser.Input.Keyboard.Key;
 
@@ -82,7 +74,7 @@ export class GameScene extends Phaser.Scene {
 
     this.highestPlatformY = Number.POSITIVE_INFINITY;
     this.highestPlatformX = 0;
-    
+
     this.cameras.main.setScroll(0, 0);
     // спрайты рисуются по целым пикселям, иначе пиксельная графика «дрожит» при движении
     this.cameras.main.setRoundPixels(true);
@@ -99,90 +91,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createClouds(height);
 
-    this.add
-      .text(width / 2, 20, 'PLATFORM JUMP', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '28px',
-        color: '#ffffff',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.HUD_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(100)
-      .setScrollFactor(0);
-
-    this.add
-      .text(width / 2, 58, '← → или A D — движение   |   P или Esc — пауза', {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '16px',
-          color: '#e2e8f0',
-          stroke: config.HUD_STROKE_COLOR,
-          strokeThickness: config.HUD_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(100)
-      .setScrollFactor(0);
-
-    this.add
-      .text(width / 2, 82, 'Прыжок автоматический: двигайся влево-вправо и попадай на платформы!', {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '16px',
-          color: '#e2e8f0',
-          stroke: config.HUD_STROKE_COLOR,
-          strokeThickness: config.HUD_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(100)
-      .setScrollFactor(0);
-
-    this.scoreDigits = [];
-    this.updateScore();
-    this.createHearts(width);
-
-    this.statusText = this.add
-      .text(width / 2, height / 2, '', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '32px',
-        color: '#ffffff',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.HUD_STROKE_THICKNESS,
-        align: 'center',
-      })
-      .setOrigin(0.5)
-      .setDepth(100)
-      .setScrollFactor(0);
-
-    this.pauseOverlay = this.add
-      .rectangle(width / 2, height / 2, width, height, config.PAUSE_OVERLAY_COLOR, config.PAUSE_OVERLAY_ALPHA)
-      .setDepth(190)
-      .setScrollFactor(0)
-      .setVisible(false);
-
-    this.pauseText = this.add
-      .text(width / 2, height / 2 - 20, 'ПАУЗА', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '56px',
-        color: '#ffffff',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.PAUSE_TITLE_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5)
-      .setDepth(200)
-      .setScrollFactor(0)
-      .setVisible(false);
-
-    this.pauseHint = this.add
-      .text(width / 2, height / 2 + 40, 'P или Esc — продолжить', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '20px',
-        color: '#e2e8f0',
-        stroke: config.HUD_STROKE_COLOR,
-        strokeThickness: config.HUD_STROKE_THICKNESS,
-      })
-      .setOrigin(0.5)
-      .setDepth(200)
-      .setScrollFactor(0)
-      .setVisible(false);
+    this.hud = new Hud(this);
 
     this.createPlayer();
     this.createPlatforms();
@@ -212,7 +121,7 @@ export class GameScene extends Phaser.Scene {
         platform.setData('used', true);
 
         this.score += 1;
-        this.updateScore();
+        this.hud.updateScore(this.score);
 
         if (this.phase === 1 && this.score >= config.PHASE_2_SCORE) {
           this.startPhase2();
@@ -318,65 +227,14 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // очки рисуются цифрами из набора; новые цифры добавляются, когда число становится длиннее
-  private updateScore(): void {
-    const digits = String(this.score);
-    const step = config.TILE_SIZE * config.SPRITE_SCALE;
-
-    while (this.scoreDigits.length < digits.length) {
-      const digit = this.add
-        .image(
-          config.HUD_MARGIN + this.scoreDigits.length * step,
-          config.HUD_MARGIN,
-          config.TILE_SHEET_KEY,
-          config.DIGIT_FIRST_FRAME,
-        )
-        .setOrigin(0, 0)
-        .setScale(config.SPRITE_SCALE)
-        .setDepth(100)
-        .setScrollFactor(0);
-
-      this.scoreDigits.push(digit);
-    }
-
-    digits.split('').forEach((char, index) => {
-      this.scoreDigits[index].setFrame(config.DIGIT_FIRST_FRAME + Number(char));
-    });
-  }
-
-  // жизни: полное сердце — жизнь есть, пустое — потеряна (теряются справа налево)
-  private createHearts(width: number): void {
-    const size = config.TILE_SIZE * config.SPRITE_SCALE;
-    const total = config.PLAYER_LIVES * size + (config.PLAYER_LIVES - 1) * config.HEART_GAP;
-    const startX = width - config.HUD_MARGIN - total;
-
-    this.hearts = [];
-
-    for (let index = 0; index < config.PLAYER_LIVES; index++) {
-      const heart = this.add
-        .image(
-          startX + index * (size + config.HEART_GAP) + size / 2,
-          config.HUD_MARGIN + size / 2,
-          config.TILE_SHEET_KEY,
-          config.HEART_FULL_FRAME,
-        )
-        .setScale(config.SPRITE_SCALE)
-        .setDepth(100)
-        .setScrollFactor(0);
-
-      this.hearts.push(heart);
-    }
-  }
-
-  private updateHearts(): void {
-    this.hearts.forEach((heart, index) => {
-      heart.setFrame(index < this.lives ? config.HEART_FULL_FRAME : config.HEART_EMPTY_FRAME);
-    });
-  }
-
   private createPlayer(): void {
     this.player = this.add
-      .sprite(config.PLAYER_START_X, config.START_Y - config.PLAYER_SIZE, config.CHARACTER_SHEET_KEY, config.PLAYER_FRAME)
+      .sprite(
+        config.PLAYER_START_X,
+        config.START_Y - config.PLAYER_SIZE,
+        config.CHARACTER_SHEET_KEY,
+        config.PLAYER_FRAME,
+      )
       .setScale(config.SPRITE_SCALE)
       .setDepth(10);
 
@@ -385,7 +243,10 @@ export class GameScene extends Phaser.Scene {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
 
     // размер тела задаётся в пикселях исходного кадра, поэтому делим на масштаб
-    body.setSize(config.PLAYER_SIZE / config.SPRITE_SCALE, config.PLAYER_SIZE / config.SPRITE_SCALE);
+    body.setSize(
+      config.PLAYER_SIZE / config.SPRITE_SCALE,
+      config.PLAYER_SIZE / config.SPRITE_SCALE,
+    );
     body.setAllowGravity(true);
     body.setCollideWorldBounds(false);
   }
@@ -468,8 +329,12 @@ export class GameScene extends Phaser.Scene {
     while (this.highestPlatformY > spawnLimit) {
       const previousLevelY = this.highestPlatformY;
 
-      const levelY = previousLevelY - Phaser.Math.Between(config.MIN_LEVEL_GAP, config.MAX_LEVEL_GAP);
-      const count = Phaser.Math.Between(config.MIN_PLATFORMS_PER_LEVEL, config.MAX_PLATFORMS_PER_LEVEL);
+      const levelY =
+        previousLevelY - Phaser.Math.Between(config.MIN_LEVEL_GAP, config.MAX_LEVEL_GAP);
+      const count = Phaser.Math.Between(
+        config.MIN_PLATFORMS_PER_LEVEL,
+        config.MAX_PLATFORMS_PER_LEVEL,
+      );
 
       const positions = this.levelGenerator.nextPositions(count);
 
@@ -521,13 +386,16 @@ export class GameScene extends Phaser.Scene {
   private regenerateLevelsAbove(): void {
     const cutoff = this.cameras.main.scrollY - config.PLATFORM_HEIGHT;
 
-    this.platforms.getChildren().slice().forEach((child) => {
-      const platform = child as Phaser.GameObjects.Rectangle;
+    this.platforms
+      .getChildren()
+      .slice()
+      .forEach((child) => {
+        const platform = child as Phaser.GameObjects.Rectangle;
 
-      if (platform.y < cutoff) {
-        this.platforms.remove(platform, true, true);
-      }
-    });
+        if (platform.y < cutoff) {
+          this.platforms.remove(platform, true, true);
+        }
+      });
 
     // самая верхняя из оставшихся платформ снова становится точкой, от которой идёт генерация
     const remaining = this.platforms.getChildren() as Phaser.GameObjects.Rectangle[];
@@ -551,18 +419,11 @@ export class GameScene extends Phaser.Scene {
     this.wasd = this.input.keyboard.addKeys({
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
-    }) as Record<
-      'left' | 'right',
-      Phaser.Input.Keyboard.Key
-    >;
+    }) as Record<'left' | 'right', Phaser.Input.Keyboard.Key>;
 
-    this.pauseKey = this.input.keyboard.addKey(
-      Phaser.Input.Keyboard.KeyCodes.P
-    );
+    this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
 
-    this.escKey = this.input.keyboard.addKey(
-      Phaser.Input.Keyboard.KeyCodes.ESC
-    );
+    this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
   }
 
   // движение игрока и прыжки.
@@ -588,7 +449,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkFall(): void {
-    const bottomLimit = this.cameras.main.scrollY + this.cameras.main.height + config.FALL_DEATH_MARGIN;
+    const bottomLimit =
+      this.cameras.main.scrollY + this.cameras.main.height + config.FALL_DEATH_MARGIN;
 
     if (this.player.y > bottomLimit && this.loseLife('ТЫ УПАЛ!')) {
       this.respawnPlayer();
@@ -615,10 +477,10 @@ export class GameScene extends Phaser.Scene {
 
     this.enemies.speedUpForPhase2();
 
-    this.statusText.setText('ФАЗА 2');
+    this.hud.setStatus('ФАЗА 2');
     this.time.delayedCall(config.PHASE_BANNER_MS, () => {
       if (!this.gameOver) {
-        this.statusText.setText('');
+        this.hud.setStatus('');
       }
     });
   }
@@ -636,16 +498,16 @@ export class GameScene extends Phaser.Scene {
       this.tweens.resumeAll();
     }
 
-    this.pauseOverlay.setVisible(this.isPaused);
-    this.pauseText.setVisible(this.isPaused);
-    this.pauseHint.setVisible(this.isPaused);
+    this.hud.setPaused(this.isPaused);
   }
 
-    // возвращает true, если игрок ещё жив
+  // возвращает true, если игрок ещё жив
   private loseLife(message: string): boolean {
     this.lives -= 1;
-    this.updateHearts();
-    this.popLostHeart();
+    const lostIndex = this.lives;
+
+    this.hud.updateHearts(this.lives);
+    this.hud.popLostHeart(lostIndex);
 
     if (this.lives <= 0) {
       this.endGame(message);
@@ -694,19 +556,6 @@ export class GameScene extends Phaser.Scene {
   private flashPlayer(color: number, durationMs: number): void {
     this.player.setTint(color).setTintMode(Phaser.TintModes.FILL);
     this.time.delayedCall(durationMs, () => this.player.clearTint());
-  }
-
-  // при любой потере жизни потерянное сердце на мгновение увеличивается
-  private popLostHeart(): void {
-    const lostHeart = this.hearts[this.lives];
-    if (lostHeart) {
-      this.tweens.add({
-        targets: lostHeart,
-        scale: config.SPRITE_SCALE * config.HEART_POP_SCALE,
-        duration: config.HEART_POP_MS,
-        yoyo: true,
-      });
-    }
   }
 
   // пока игрок неуязвим, он мигает
@@ -771,7 +620,7 @@ export class GameScene extends Phaser.Scene {
       `${message}\n\n` +
       `Результат: ${this.score} очков`;
 
-    this.statusText.setText(resultText);
+    this.hud.setStatus(resultText);
     this.player.setAlpha(0.5);
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
