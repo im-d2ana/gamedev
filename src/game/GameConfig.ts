@@ -60,15 +60,15 @@ export const MAX_PLATFORMS_PER_LEVEL = 2;
 export const MIN_LEVEL_GAP = 80;
 export const MAX_LEVEL_GAP = 130;
 
-export const DISAPPEARING_CHANCE = 0.35;
-export const DISAPPEARING_CHANCE_MAX = 0.6;
-export const DISAPPEARING_FULL_HEIGHT = 12000;
+export const DISAPPEARING_CHANCE = 0.25;
+export const DISAPPEARING_CHANCE_MAX = 0.55;
+export const DISAPPEARING_FULL_HEIGHT = 30000;
 export const DISAPPEARING_PLATFORM_DELAY_MS = 500;
 
-export const ENEMY_CHANCE = 0.12;
-export const ENEMY_CHANCE_MAX = 0.35;
+export const ENEMY_CHANCE = 0.1;
+export const ENEMY_CHANCE_MAX = 0.3;
 export const ENEMY_START_HEIGHT = 400;
-export const ENEMY_FULL_HEIGHT = 12000;
+export const ENEMY_FULL_HEIGHT = 32000;
 export const ENEMY_RADIUS = 16;
 export const ENEMY_SPEED = 90;
 export const ENEMY_PATROL_RANGE = 90;

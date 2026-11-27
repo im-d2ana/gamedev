@@ -12,7 +12,9 @@ export function disappearingChance(y: number, phase: number): number {
     config.DISAPPEARING_CHANCE +
     (config.DISAPPEARING_CHANCE_MAX - config.DISAPPEARING_CHANCE) * progress;
 
-  return phase === 2 ? chance + config.PHASE_2_DISAPPEARING_CHANCE_BONUS : chance;
+  return phase === 2
+    ? Math.min(chance + config.PHASE_2_DISAPPEARING_CHANCE_BONUS, 1)
+    : chance;
 }
 
 export function enemyChance(y: number, phase: number): number {
