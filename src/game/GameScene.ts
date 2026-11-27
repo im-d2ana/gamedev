@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import * as config from './GameConfig';
-import { Enemies } from './enemies';
+import { Enemies } from './Enemies';
 import { Hud } from './Hud';
 import { Platforms } from './Platforms';
 

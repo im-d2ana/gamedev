@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import * as config from './GameConfig';
-import { disappearingChance } from './difficulty';
+import { disappearingChance } from './Difficulty';
 import { LevelGenerator, pickDisappearingSlots } from './LevelGenerator';
 
 export interface SpawnedLevel {

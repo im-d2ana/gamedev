@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import * as config from './GameConfig';
-import { enemyChance } from './difficulty';
+import { enemyChance } from './Difficulty';
 
 export class Enemies {
   readonly group: Phaser.Physics.Arcade.Group;
