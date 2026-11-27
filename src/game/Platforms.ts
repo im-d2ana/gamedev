@@ -48,7 +48,7 @@ export class Platforms {
   }
 
   removeBelow(limitY: number): void {
-    this.group.getChildren().forEach((child) => {
+    this.group.getChildren().slice().forEach((child) => {
       const platform = child as Phaser.GameObjects.Rectangle;
       if (platform.y > limitY) {
         this.group.remove(platform, true, true);

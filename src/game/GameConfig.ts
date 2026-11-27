@@ -54,7 +54,7 @@ export const MIN_LEVEL_X_SHIFT = 140;
 export const MAX_LEVEL_X_SHIFT = 240;
 export const LEVEL_POSITION_ATTEMPTS = 100;
 export const PLATFORM_SPAWN_MARGIN = 300;
-export const PLATFORM_REMOVE_MARGIN = 200;
+export const PLATFORM_REMOVE_MARGIN = 0;
 export const MIN_PLATFORMS_PER_LEVEL = 1;
 export const MAX_PLATFORMS_PER_LEVEL = 2;
 export const MIN_LEVEL_GAP = 80;
@@ -85,7 +85,7 @@ export const PHASE_2_SCORE = 10;
 export const HAZARDS_START_PHASE = 2;
 export const PHASE_BANNER_MS = 2000;
 export const PHASE_2_ENEMY_SPEED_MULTIPLIER = 1.6;
-export const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.4;
+export const PHASE_2_ENEMY_CHANCE_MULTIPLIER = 1.3;
 export const PHASE_2_DISAPPEARING_CHANCE_BONUS = 0.2;
 
 export const PLAYER_LIVES = 3;
@@ -96,7 +96,7 @@ export const HUD_MARGIN = 24;
 export const DIGIT_FIRST_FRAME = 170;
 
 export const INVULNERABLE_MS = 1500;
-export const FALL_DEATH_MARGIN = 80;
+export const FALL_DEATH_MARGIN = 40;
 export const RESPAWN_BOTTOM_MARGIN = 60;
 export const RESTART_DELAY_MS = 1500;
 
