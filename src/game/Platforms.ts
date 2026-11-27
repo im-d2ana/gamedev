@@ -83,7 +83,7 @@ export class Platforms {
 
   scheduleDisappear(platform: Phaser.GameObjects.Rectangle): void {
     this.scene.time.delayedCall(config.DISAPPEARING_PLATFORM_DELAY_MS, () => {
-      if (!platform.active) {
+      if (!platform.active || !platform.getData('disappearing')) {
         return;
       }
 
@@ -94,7 +94,7 @@ export class Platforms {
     });
   }
 
-  // ищет самую нижнюю видимую платформу не ниже указанного порога
+  // ищет самую нижнюю видимую платформу не ниже порога и при необходимости делает её постоянной
   findRespawnTarget(maxY: number): Phaser.GameObjects.Rectangle | null {
     let target: Phaser.GameObjects.Rectangle | null = null;
 
@@ -111,7 +111,22 @@ export class Platforms {
       }
     }
 
+    if (target !== null) {
+      this.makePermanent(target);
+    }
+
     return target;
+  }
+
+  private makePermanent(platform: Phaser.GameObjects.Rectangle): void {
+    if (!platform.getData('disappearing')) {
+      return;
+    }
+
+    platform.setData('disappearing', false);
+    this.platformTiles(platform).forEach((tile, index) => {
+      tile.setFrame(config.PLATFORM_FRAMES[index]);
+    });
   }
 
   private createInitial(): void {
