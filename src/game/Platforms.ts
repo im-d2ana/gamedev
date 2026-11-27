@@ -82,15 +82,37 @@ export class Platforms {
   }
 
   scheduleDisappear(platform: Phaser.GameObjects.Rectangle): void {
+    const tiles = this.platformTiles(platform);
+    const middle = (tiles.length - 1) / 2;
+
+    // в момент прыжка тайлы слегка разъезжаются, проседают и дрожат — видно, что опора треснула
+    tiles.forEach((tile, index) => {
+      const offsetIndex = index - middle;
+      const baseX = tile.x + offsetIndex * config.DISAPPEARING_CRACK_GAP;
+      tile
+        .setPosition(baseX, tile.y + config.DISAPPEARING_CRACK_SAG)
+        .setAngle(offsetIndex * 4)
+        .setAlpha(0.85);
+
+      this.scene.tweens.add({
+        targets: tile,
+        x: baseX + config.DISAPPEARING_SHAKE_OFFSET,
+        duration: config.DISAPPEARING_SHAKE_MS,
+        yoyo: true,
+        repeat: -1,
+      });
+    });
+
     this.scene.time.delayedCall(config.DISAPPEARING_PLATFORM_DELAY_MS, () => {
       if (!platform.active || !platform.getData('disappearing')) {
         return;
       }
 
       platform.setVisible(false);
-      this.platformTiles(platform).forEach((tile) => tile.setVisible(false));
       const body = platform.body as Phaser.Physics.Arcade.StaticBody;
       body.enable = false;
+
+      this.playBreakEffect(tiles);
     });
   }
 
@@ -118,14 +140,46 @@ export class Platforms {
     return target;
   }
 
+  private playBreakEffect(tiles: Phaser.GameObjects.Image[]): void {
+    this.scene.tweens.killTweensOf(tiles);
+
+    const middle = (tiles.length - 1) / 2;
+    tiles.forEach((tile, index) => {
+      const offsetIndex = index - middle;
+      this.scene.tweens.add({
+        targets: tile,
+        x: tile.x + offsetIndex * config.DISAPPEARING_BREAK_SPREAD,
+        y: tile.y + config.DISAPPEARING_BREAK_DROP + (offsetIndex === 0 ? 16 : 0),
+        angle: offsetIndex * config.DISAPPEARING_BREAK_ANGLE,
+        alpha: 0,
+        duration: config.DISAPPEARING_BREAK_MS,
+        ease: 'Quad.easeIn',
+        onComplete: () => tile.setVisible(false),
+      });
+    });
+  }
+
   private makePermanent(platform: Phaser.GameObjects.Rectangle): void {
     if (!platform.getData('disappearing')) {
       return;
     }
 
     platform.setData('disappearing', false);
-    this.platformTiles(platform).forEach((tile, index) => {
-      tile.setFrame(config.PLATFORM_FRAMES[index]);
+
+    const tiles = this.platformTiles(platform);
+    this.scene.tweens.killTweensOf(tiles);
+
+    const tileSize = config.TILE_SIZE * config.SPRITE_SCALE;
+    const left = platform.x - config.PLATFORM_WIDTH / 2 + tileSize / 2;
+    const top = platform.y - config.PLATFORM_HEIGHT / 2 + tileSize / 2;
+
+    tiles.forEach((tile, index) => {
+      tile
+        .setPosition(left + index * tileSize, top)
+        .setAngle(0)
+        .setAlpha(1)
+        .setVisible(true)
+        .setFrame(config.PLATFORM_FRAMES[index]);
     });
   }
 
@@ -171,18 +225,19 @@ export class Platforms {
   ): Phaser.GameObjects.Image[] {
     const frames = disappearing ? config.DISAPPEARING_PLATFORM_FRAMES : config.PLATFORM_FRAMES;
     const tileSize = config.TILE_SIZE * config.SPRITE_SCALE;
-    const left = platform.x - config.PLATFORM_WIDTH / 2;
-    const top = platform.y - config.PLATFORM_HEIGHT / 2;
+    const left = platform.x - config.PLATFORM_WIDTH / 2 + tileSize / 2;
+    const top = platform.y - config.PLATFORM_HEIGHT / 2 + tileSize / 2;
 
     const tiles = frames.map((frame, index) =>
       this.scene.add
         .image(left + index * tileSize, top, config.TILE_SHEET_KEY, frame)
-        .setOrigin(0, 0)
+        .setOrigin(0.5, 0.5)
         .setScale(config.SPRITE_SCALE),
     );
 
     // когда платформа удаляется, вместе с ней удаляется и её картинка
     platform.once(Phaser.GameObjects.Events.DESTROY, () => {
+      this.scene.tweens.killTweensOf(tiles);
       tiles.forEach((tile) => tile.destroy());
     });
 
