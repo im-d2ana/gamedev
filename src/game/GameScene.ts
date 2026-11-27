@@ -376,7 +376,7 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(): void {
     this.player = this.add
-      .sprite(120, config.START_Y - config.PLAYER_SIZE, config.CHARACTER_SHEET_KEY, config.PLAYER_FRAME)
+      .sprite(config.PLAYER_START_X, config.START_Y - config.PLAYER_SIZE, config.CHARACTER_SHEET_KEY, config.PLAYER_FRAME)
       .setScale(config.SPRITE_SCALE)
       .setDepth(10);
 
@@ -588,7 +588,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkFall(): void {
-    const bottomLimit = this.cameras.main.scrollY + this.cameras.main.height + 80;
+    const bottomLimit = this.cameras.main.scrollY + this.cameras.main.height + config.FALL_DEATH_MARGIN;
 
     if (this.player.y > bottomLimit && this.loseLife('ТЫ УПАЛ!')) {
       this.respawnPlayer();
@@ -777,7 +777,7 @@ export class GameScene extends Phaser.Scene {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     body.setVelocity(0, 0);
 
-    this.time.delayedCall(1500, () => {
+    this.time.delayedCall(config.RESTART_DELAY_MS, () => {
       this.scene.restart();
     });
   }
